@@ -1,0 +1,17 @@
+node_modules
+dist
+.nuxt
+.output
+.vercel
+coverage
+public
+*.min.js
+*.min.css
+bun.lock
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Token CSS — fluid clamp formulas are intentionally one-liners.
+# Prettier wraps them into 16-line blocks per token; leave it alone.
+app/assets/css/tokens.css

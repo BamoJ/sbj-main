@@ -1,0 +1,56 @@
+/* ─── Theme cascade ────────────────────────────────────────────────
+   Drop `.u-theme-light` / `.u-theme-dark` / `.u-theme-brand` on any
+   wrapper. CSS variable inheritance flips the semantic tokens
+   (--color-bg / --color-fg / --color-line / --color-link-fg) for
+   every descendant. Multiple themed regions per page are fine —
+   light hero → dark band → brand CTA. */
+
+.u-theme-light {
+  --color-bg: #ffffff;
+  --color-fg: #353233;
+  --color-line: rgb(53 50 51 / 0.1);
+  --color-link-fg: #353233;
+  --color-link-fg-hover: #ffffff;
+}
+
+.u-theme-dark {
+  --color-bg: #353233;
+  --color-fg: #ffffff;
+  --color-line: rgb(255 255 255 / 0.1);
+  --color-link-fg: #ffffff;
+  --color-link-fg-hover: #c6fb50;
+}
+
+.u-theme-brand {
+  --color-bg: #c6fb50;
+  --color-fg: #353233;
+  --color-line: rgb(53 50 51 / 0.1);
+  --color-link-fg: #353233;
+  --color-link-fg-hover: #ffffff;
+
+  /* Primary inverts on brand surface — dark pill / brand label — so the
+     CTA stands out against the brand bg. */
+  --color-primary: #353233;
+  --color-on-primary: #c6fb50;
+}
+
+/* Paint the wrapper's own bg/fg so the themed region has its own surface. */
+.u-theme-light,
+.u-theme-dark,
+.u-theme-brand {
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+/* Brand primary-hover override.
+   On .u-theme-brand, --color-primary collapses onto --color-fg, so the
+   default primary-hover (which reads --color-fg / --color-bg) would land
+   on the rest color and the slide would be invisible. Redirect just the
+   primary variant to light/dark. Secondary's hover pair still reads
+   fg/bg cleanly, no override needed. */
+.u-theme-brand .btn:not([data-variant='secondary']) .btn__bg-hover {
+  background-color: var(--color-light);
+}
+.u-theme-brand .btn:not([data-variant='secondary']) .btn__text-clone {
+  color: var(--color-dark);
+}

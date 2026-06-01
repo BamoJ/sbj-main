@@ -1,0 +1,18 @@
+/* Hide native scrollbar across all browsers — Lenis renders scroll visually,
+   the native bar is just noise. Applies to html/body only; if a specific
+   scrollable panel needs a visible bar, override per-selector. */
+html,
+body {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* old Edge / IE */
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Chromium Edge */
+}
+
+.line-mask {
+  padding-right: 0.25em;
+  padding-bottom: 0.02em; /* Prevent clipping of final character when animating with SplitType's mask */
+}

@@ -1,0 +1,26 @@
+# Studio•Bamo.J®
+
+> A creative studio building distinctive digital experiences with motion, type, and WebGL.
+
+## Pages
+
+- [Home](http://localhost:3000/): Studio overview
+- [About](http://localhost:3000/about): Studio philosophy and practice
+- [Work](http://localhost:3000/work): Selected projects and case studies
+- [Contact](http://localhost:3000/contact): Get in touch
+
+## Notes
+
+This site is rendered as a SPA — full content is hydrated client-side. AI
+crawlers that execute JavaScript will see the same content a browser does.
+
+Sitemap available at /sitemap.xml. robots.txt at /robots.txt declares the
+allow/block policy for individual AI bots (GPTBot, ClaudeBot, PerplexityBot,
+etc.) — check there for the current state.
+
+## Editing this file
+
+For a real project: replace the absolute URLs above with the production
+domain (matching NUXT_PUBLIC_SITE_URL in .env), update the site description
+to the client's, and adjust the page list as routes evolve. See
+.claude/skills/aeo/SKILL.md for the full per-project setup.

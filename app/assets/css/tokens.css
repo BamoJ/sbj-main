@@ -1,0 +1,165 @@
+/* ─── EDIT HERE ────────────────────────────────────────────────────
+   Each pair: min = mobile size (rem), max = desktop size (rem).
+   Change a number → its token's clamp() recomputes automatically.
+   Don't touch the @theme formulas below — they derive from these. */
+
+:root {
+  /* Type scale */
+  --text-display-min: 3.5;       --text-display-max: 12.2;
+  --text-h1-min: 3.5;            --text-h1-max: 8;
+  --text-h2-min: 3;              --text-h2-max: 6;
+  --text-h3-min: 2;              --text-h3-max: 4;
+  --text-h4-min: 1.25;           --text-h4-max: 2;
+  --text-h5-min: 1;              --text-h5-max: 1.5;
+  --text-h6-min: 1;              --text-h6-max: 1.25;
+  --text-xlarge-min: 1.85;       --text-xlarge-max: 4;
+  --text-large-min: 2;           --text-large-max: 3;
+  --text-medium-min: 1;          --text-medium-max: 2;
+  --text-main-min: 0.875;        --text-main-max: 1;
+  --text-small-min: 0.65;        --text-small-max: 0.85;
+
+  /* Spacing */
+  --spacing-margin-min: 1.875;   --spacing-margin-max: 3.75;
+}
+
+/* ───────────────────────────────────────────────────────────────────
+   Below: formulas. Don't touch unless changing the math itself.
+   Each fluid token = one-line clamp() referencing its --min/--max pair.
+   ─────────────────────────────────────────────────────────────────── */
+
+@theme {
+  /* Site bounds — drive every fluid token (live, not baked in). */
+  --site-viewport-min: 20;  /* rem — 320px  */
+  --site-viewport-max: 120; /* rem — 1920px */
+
+  /* Spacing */
+  --spacing-gutter: 1rem;
+  --spacing-margin: clamp(calc(var(--spacing-margin-min) * 1rem), calc((var(--spacing-margin-min) - (var(--spacing-margin-max) - var(--spacing-margin-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * var(--site-viewport-min)) * 1rem + (var(--spacing-margin-max) - var(--spacing-margin-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * 100vw), calc(var(--spacing-margin-max) * 1rem));
+
+  /* Max-widths */
+  --max-width-small: 80rem;
+  --max-width-main: calc(var(--site-viewport-max) * 1rem);
+  --max-width-full: 100%;
+
+  /* Type — clamp() + bundled font-weight / line-height / letter-spacing per token */
+  --text-display: clamp(calc(var(--text-display-min) * 1rem), calc((var(--text-display-min) - (var(--text-display-max) - var(--text-display-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * var(--site-viewport-min)) * 1rem + (var(--text-display-max) - var(--text-display-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * 100vw), calc(var(--text-display-max) * 1rem));
+  --text-display--font-weight: 500;
+  --text-display--line-height: 1.1;
+  --text-display--letter-spacing: -0.05em;
+
+  --text-h1: clamp(calc(var(--text-h1-min) * 1rem), calc((var(--text-h1-min) - (var(--text-h1-max) - var(--text-h1-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * var(--site-viewport-min)) * 1rem + (var(--text-h1-max) - var(--text-h1-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * 100vw), calc(var(--text-h1-max) * 1rem));
+  --text-h1--font-weight: 700;
+  --text-h1--line-height: 1.05;
+  --text-h1--letter-spacing: -0.04em;
+
+  --text-h2: clamp(calc(var(--text-h2-min) * 1rem), calc((var(--text-h2-min) - (var(--text-h2-max) - var(--text-h2-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * var(--site-viewport-min)) * 1rem + (var(--text-h2-max) - var(--text-h2-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * 100vw), calc(var(--text-h2-max) * 1rem));
+  --text-h2--font-weight: 700;
+  --text-h2--line-height: 1.1;
+  --text-h2--letter-spacing: -0.03em;
+
+  --text-h3: clamp(calc(var(--text-h3-min) * 1rem), calc((var(--text-h3-min) - (var(--text-h3-max) - var(--text-h3-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * var(--site-viewport-min)) * 1rem + (var(--text-h3-max) - var(--text-h3-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * 100vw), calc(var(--text-h3-max) * 1rem));
+  --text-h3--font-weight: 500;
+  --text-h3--line-height: 1.15;
+  --text-h3--letter-spacing: -0.02em;
+
+  --text-h4: clamp(calc(var(--text-h4-min) * 1rem), calc((var(--text-h4-min) - (var(--text-h4-max) - var(--text-h4-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * var(--site-viewport-min)) * 1rem + (var(--text-h4-max) - var(--text-h4-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * 100vw), calc(var(--text-h4-max) * 1rem));
+  --text-h4--font-weight: 500;
+  --text-h4--line-height: 1.2;
+  --text-h4--letter-spacing: -0.015em;
+
+  --text-h5: clamp(calc(var(--text-h5-min) * 1rem), calc((var(--text-h5-min) - (var(--text-h5-max) - var(--text-h5-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * var(--site-viewport-min)) * 1rem + (var(--text-h5-max) - var(--text-h5-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * 100vw), calc(var(--text-h5-max) * 1rem));
+  --text-h5--font-weight: 500;
+  --text-h5--line-height: 1.3;
+  --text-h5--letter-spacing: -0.01em;
+
+  --text-h6: clamp(calc(var(--text-h6-min) * 1rem), calc((var(--text-h6-min) - (var(--text-h6-max) - var(--text-h6-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * var(--site-viewport-min)) * 1rem + (var(--text-h6-max) - var(--text-h6-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * 100vw), calc(var(--text-h6-max) * 1rem));
+  --text-h6--font-weight: 500;
+  --text-h6--line-height: 1.4;
+  --text-h6--letter-spacing: -0.005em;
+
+  --text-xlarge: clamp(calc(var(--text-xlarge-min) * 1rem), calc((var(--text-xlarge-min) - (var(--text-xlarge-max) - var(--text-xlarge-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * var(--site-viewport-min)) * 1rem + (var(--text-xlarge-max) - var(--text-xlarge-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * 100vw), calc(var(--text-xlarge-max) * 1rem));
+  --text-xlarge--font-weight: 400;
+  --text-xlarge--line-height: 1.3;
+  --text-xlarge--letter-spacing: 0;
+
+  --text-large: clamp(calc(var(--text-large-min) * 1rem), calc((var(--text-large-min) - (var(--text-large-max) - var(--text-large-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * var(--site-viewport-min)) * 1rem + (var(--text-large-max) - var(--text-large-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * 100vw), calc(var(--text-large-max) * 1rem));
+  --text-large--font-weight: 400;
+  --text-large--line-height: 1.4;
+  --text-large--letter-spacing: 0;
+
+  --text-medium: clamp(calc(var(--text-medium-min) * 1rem), calc((var(--text-medium-min) - (var(--text-medium-max) - var(--text-medium-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * var(--site-viewport-min)) * 1rem + (var(--text-medium-max) - var(--text-medium-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * 100vw), calc(var(--text-medium-max) * 1rem));
+  --text-medium--font-weight: 400;
+  --text-medium--line-height: 1.5;
+  --text-medium--letter-spacing: 0;
+
+  --text-main: clamp(calc(var(--text-main-min) * 1rem), calc((var(--text-main-min) - (var(--text-main-max) - var(--text-main-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * var(--site-viewport-min)) * 1rem + (var(--text-main-max) - var(--text-main-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * 100vw), calc(var(--text-main-max) * 1rem));
+  --text-main--font-weight: 400;
+  --text-main--line-height: 1.5;
+  --text-main--letter-spacing: 0;
+
+  --text-small: clamp(calc(var(--text-small-min) * 1rem), calc((var(--text-small-min) - (var(--text-small-max) - var(--text-small-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * var(--site-viewport-min)) * 1rem + (var(--text-small-max) - var(--text-small-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * 100vw), calc(var(--text-small-max) * 1rem));
+  --text-small--font-weight: 400;
+  --text-small--line-height: 1.4;
+  --text-small--letter-spacing: 0;
+
+  /* Font weights */
+  --font-weight-thin: 200;
+  --font-weight-light: 300;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+
+  /* Radius */
+  --radius-small: 0.5rem;
+  --radius-main: 1rem;
+  --radius-round: 100vw;
+
+  /* Grid */
+  --grid-cols: 12;
+
+  /* Raw swatch — constant in every theme. */
+  --color-transparent: transparent;
+  --color-dark: #353233;
+  --color-dark-faded: rgb(53 50 51 / 0.1);
+  --color-light: #ffffff;
+  --color-light-faded: rgb(255 255 255 / 0.1);
+  --color-brand: #c6fb50;
+  --color-brand-text: #353233;
+
+  /* Semantic page tokens — flipped by .u-theme-* cascade in theme.css */
+  --color-bg: #ffffff;
+  --color-fg: #353233;
+  --color-line: rgb(53 50 51 / 0.1);
+  --color-link-fg: #353233;
+  --color-link-fg-hover: #ffffff;
+
+  /* Primary button — defaults to brand, inverted inside .u-theme-brand
+     so it stays visible when the surrounding wrapper IS brand-colored. */
+  --color-primary: #c6fb50; /* brand */
+  --color-on-primary: #353233; /* brand-text */
+
+}
+
+/* ─── Per-token trim adjustments ────────────────────────────────
+   Edit values to nudge text-trim per style. Defaults are 0em (no
+   adjustment — full -0.51lh top / -0.5lh bottom from typography.css).
+
+   Positive em = more room (descenders g/y/p/q breathe).
+   Negative em = tighter trim.
+
+   The visible effect is proportional to the token's line-height. For
+   text-display (line-height 1), there's almost no leading to trim — try
+   tweaks on text-medium / text-main (line-height 1.5) first to see it. */
+
+.text-display { --text-trim-top: .40em; --text-trim-bottom: .40em; }
+.text-h1      { --text-trim-top: .39em; --text-trim-bottom: .39em; }
+.text-h2      { --text-trim-top: .39em; --text-trim-bottom: .39em; }
+.text-h3      { --text-trim-top: .39em; --text-trim-bottom: .39em; }
+.text-h4      { --text-trim-top: .39em; --text-trim-bottom: .39em; }
+.text-h5      { --text-trim-top: .39em; --text-trim-bottom: .39em; }
+.text-h6      { --text-trim-top: .39em; --text-trim-bottom: .39em; }
+.text-xlarge  { --text-trim-top: .39em; --text-trim-bottom: .39em; }
+.text-large   { --text-trim-top: .39em; --text-trim-bottom: .39em; }
+.text-medium  { --text-trim-top: .39em; --text-trim-bottom: .39em; }
+.text-main    { --text-trim-top: .39em; --text-trim-bottom: .39em; }
+.text-small   { --text-trim-top: .39em; --text-trim-bottom: .39em; }

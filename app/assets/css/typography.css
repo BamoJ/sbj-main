@@ -1,0 +1,27 @@
+/* ─── Text trim — Capsize-style line-height cleanup ──────────────
+   Removes intrinsic font leading via ::before/::after pseudo-elements.
+   `lh` resolves to the element's computed line-height, so the trim
+   scales with each text style's bundled --text-X--line-height.
+
+   Default trim: -0.51lh top, -0.5lh bottom.
+   Fine-tune per element via Tailwind arbitrary property:
+     <h1 class="text-h1 [--text-trim-bottom:0.05em]">…</h1>
+   Or per token in tokens.css below @theme:
+     .text-h1 { --text-trim-bottom: 0.04em; }
+
+   Applies to semantic text tags: h1, h2, h3, h4, h5, h6, p.
+   Suppressed when:
+     - element has .u-text-trim-off
+     - element contains a nested trim target (prevents double-trim) */
+
+:is(h1, h2, h3, h4, h5, h6, p):not(.u-text-trim-off, :has(:is(h1, h2, h3, h4, h5, h6, p)))::before {
+  content: '';
+  display: table;
+  margin-bottom: calc(-0.51lh + var(--text-trim-top, 0em));
+}
+
+:is(h1, h2, h3, h4, h5, h6, p):not(.u-text-trim-off, :has(:is(h1, h2, h3, h4, h5, h6, p)))::after {
+  content: '';
+  display: table;
+  margin-top: calc(-0.5lh + var(--text-trim-bottom, 0em));
+}

@@ -1,0 +1,12 @@
+@import 'tailwindcss';
+
+/* Base layers — resets, framework styles, fonts, body defaults */
+@import './reset.css';
+@import './lenis.css';
+@import './base.css';
+@import './fonts.css';
+@import './typography.css';
+
+/* Design system — tokens (knobs + @theme formulas) + theme cascade */
+@import './tokens.css';
+@import './theme.css';
