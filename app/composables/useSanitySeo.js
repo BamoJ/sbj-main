@@ -23,7 +23,20 @@
 
 export function useSanitySeo(slug, defaults = {}) {
   const page = usePageData(slug)
-  const sanity = typeof useSanity === 'function' ? useSanity() : null
+
+  // Sanity's client throws ("Configuration must contain `projectId`") if it's
+  // instantiated before a project is wired. Guard on projectId (same check the
+  // prefetch plugin uses) so pages still render on their hardcoded defaults
+  // before Sanity is configured.
+  const projectId = useRuntimeConfig().public.sanity?.projectId
+  let sanity = null
+  if (projectId && typeof useSanity === 'function') {
+    try {
+      sanity = useSanity()
+    } catch {
+      sanity = null
+    }
+  }
 
   const cms = page.value?.seo ?? {}
 

@@ -20,12 +20,19 @@ export default defineNuxtPlugin(async () => {
   const config = useRuntimeConfig().public
   if (!config.sanity?.projectId) return
 
-  const sanity = useSanity()
-  const pages = await sanity.fetch(groq`*[_type == "page"]{
-    "slug": slug.current,
-    title,
-    sections,
-  }`)
-
-  useState('sanity:pages', () => pages ?? [])
+  // A failed fetch here (network, or — common in dev — localhost not yet an
+  // allowed CORS origin in the Sanity project) must NOT crash app init.
+  // Catch it and fall back to an empty cache so pages render on defaults.
+  try {
+    const sanity = useSanity()
+    const pages = await sanity.fetch(groq`*[_type == "page"]{
+      "slug": slug.current,
+      title,
+      sections,
+    }`)
+    useState('sanity:pages', () => pages ?? [])
+  } catch (err) {
+    console.warn('[sanity-prefetch] skipped (Sanity unreachable / CORS):', err?.message || err)
+    useState('sanity:pages', () => [])
+  }
 })

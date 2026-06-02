@@ -1,13 +1,12 @@
 # Studio•Bamo.J®
 
-> A creative studio building distinctive digital experiences with motion, type, and WebGL.
+> The portfolio of Bamo.J® — a creative studio building distinctive digital
+> experiences with motion and type. This site is currently a single-page
+> placeholder indexing selected work.
 
 ## Pages
 
-- [Home](http://localhost:3000/): Studio overview
-- [About](http://localhost:3000/about): Studio philosophy and practice
-- [Work](http://localhost:3000/work): Selected projects and case studies
-- [Contact](http://localhost:3000/contact): Get in touch
+- [Home](http://localhost:3000/): Studio overview and an index of selected work
 
 ## Notes
 
@@ -20,7 +19,7 @@ etc.) — check there for the current state.
 
 ## Editing this file
 
-For a real project: replace the absolute URLs above with the production
-domain (matching NUXT_PUBLIC_SITE_URL in .env), update the site description
-to the client's, and adjust the page list as routes evolve. See
-.claude/skills/aeo/SKILL.md for the full per-project setup.
+Replace the absolute URLs above with the production domain (matching
+NUXT_PUBLIC_SITE_URL in .env) at deploy, and expand the page list as routes
+evolve past the placeholder. See .claude/skills/aeo/SKILL.md for the full
+per-project setup.

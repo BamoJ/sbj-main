@@ -1,13 +1,10 @@
 <script setup>
-const route = useRoute()
-
-const navItems = [
-  { name: 'Home', path: '/' },
-  { name: 'About', path: '/about' },
-  { name: 'Work', path: '/work' },
-  { name: 'Contact', path: '/contact' },
-  { name: 'CMSdemo', path: '/cms-demo' },
-]
+// One-pager nav: logo (back to top) + in-page anchor links. Add/remove
+// anchors here as sections land on the landing page. When the site grows
+// past a single page, swap these for route links (or drive from the Sanity
+// `settings` singleton — see studio/schemas/documents/settings.ts).
+// Hero-only homepage for now — no in-page sections to anchor to yet.
+const navItems = []
 </script>
 
 <template>
@@ -23,10 +20,6 @@ const navItems = [
             :key="item.path"
             class="relative flex flex-row gap-2 items-center"
           >
-            <div
-              class="h-1 w-1 bg-white transition-[opacity,transform] duration-400 ease-out"
-              :class="route.path === item.path ? 'opacity-100 scale-100' : 'opacity-0 scale-50'"
-            ></div>
             <TextLink :to="item.path">
               {{ item.name }}
             </TextLink>

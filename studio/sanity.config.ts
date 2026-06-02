@@ -1,6 +1,7 @@
 import { defineConfig } from 'sanity'
 import { structureTool } from 'sanity/structure'
 import { visionTool } from '@sanity/vision'
+import { orderableDocumentListDeskItem } from '@sanity/orderable-document-list'
 import { schemaTypes } from './schemas'
 
 // Per-client config — projectId/dataset come from the env so the same
@@ -12,23 +13,26 @@ export default defineConfig({
   projectId: process.env.SANITY_STUDIO_PROJECT_ID!,
   dataset: process.env.SANITY_STUDIO_DATASET || 'production',
 
+  // "Projects" is a drag-to-reorder list (orderableDocumentListDeskItem) —
+  // the order set here drives the work-index numbering on the site.
+  // "Site Settings" is a singleton (one fixed doc, no "create new").
   plugins: [
     structureTool({
-      structure: (S) =>
+      structure: (S, context) =>
         S.list()
           .title('Content')
           .items([
-            // Singletons — one editable instance, no "Create new" button
-            S.listItem()
-              .title('Homepage')
-              .child(S.editor().id('homepage').schemaType('homepage').documentId('homepage')),
             S.listItem()
               .title('Site Settings')
-              .child(S.editor().id('settings').schemaType('settings').documentId('settings')),
+              .id('settings')
+              .child(S.document().schemaType('settings').documentId('settings')),
             S.divider(),
-            // Collections — list view + "+ Create new" affordance
-            S.documentTypeListItem('page').title('Pages'),
-            S.documentTypeListItem('project').title('Projects'),
+            orderableDocumentListDeskItem({
+              type: 'project',
+              title: 'Projects',
+              S,
+              context,
+            }),
           ]),
     }),
     visionTool(),

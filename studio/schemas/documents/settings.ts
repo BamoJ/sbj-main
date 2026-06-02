@@ -1,28 +1,40 @@
 import { defineField, defineType } from 'sanity'
 
-// Singleton — one document, site-wide. Holds nav links, footer text,
-// default SEO. Studio Structure will need a customization later to
-// force it to a single doc (out of scope for the starter).
+// Singleton — site-wide settings. Currently holds the social links rendered
+// in the footer/nav. Drag the array items to reorder them on the site.
 export default defineType({
   name: 'settings',
   type: 'document',
   title: 'Site Settings',
   fields: [
-    defineField({ name: 'siteTitle', type: 'string' }),
     defineField({
-      name: 'navLinks',
+      name: 'socials',
       type: 'array',
+      title: 'Social links',
+      description: 'Drag to reorder. Use a full https:// URL, or mailto:hi@bamoj.com for email.',
       of: [
         {
           type: 'object',
+          name: 'socialLink',
           fields: [
-            { name: 'label', type: 'string' },
-            { name: 'href', type: 'string' },
+            defineField({
+              name: 'label',
+              type: 'string',
+              title: 'Label',
+              description: 'e.g. Email, LinkedIn, X/Twitter, Instagram',
+              validation: (r) => r.required(),
+            }),
+            defineField({
+              name: 'url',
+              type: 'url',
+              title: 'URL',
+              validation: (r) => r.required().uri({ scheme: ['http', 'https', 'mailto'] }),
+            }),
           ],
+          preview: { select: { title: 'label', subtitle: 'url' } },
         },
       ],
     }),
-    defineField({ name: 'footerNote', type: 'string' }),
-    defineField({ name: 'defaultSeo', type: 'seo', title: 'Default SEO' }),
   ],
+  preview: { prepare: () => ({ title: 'Site Settings' }) },
 })

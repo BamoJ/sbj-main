@@ -64,7 +64,6 @@ export default defineNuxtConfig({
   // (e.g. /work/[slug]) land — pull project slugs from Sanity server-side.
   sitemap: {
     sources: ['/api/__sitemap__/urls'],
-    exclude: ['/cms-demo'],
   },
 
   // robots.txt is module-managed. DO NOT add public/robots.txt — it conflicts.

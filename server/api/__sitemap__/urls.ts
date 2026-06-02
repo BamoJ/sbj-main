@@ -24,8 +24,8 @@
 //   return [...staticUrls, ...projectUrls]
 
 export default defineEventHandler(() => [
-  { loc: '/', changefreq: 'weekly', priority: 1.0 },
-  { loc: '/about', changefreq: 'monthly', priority: 0.8 },
-  { loc: '/work', changefreq: 'weekly', priority: 0.9 },
-  { loc: '/contact', changefreq: 'monthly', priority: 0.7 },
+  // One-pager placeholder — the homepage is the only route. When real pages
+  // (/work/[slug], /about, …) land, add them here (and pull project slugs
+  // from Sanity server-side per the example above).
+  { loc: '/', changefreq: 'monthly', priority: 1.0 },
 ])
