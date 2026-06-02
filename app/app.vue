@@ -6,7 +6,6 @@ useLenis()
 
 <template>
   <Theme class="u-theme-dark">
-    <WebGLCanvas />
     <MainNav />
     <main>
       <NuxtPage />

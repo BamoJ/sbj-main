@@ -89,8 +89,8 @@
 
   --text-medium: clamp(calc(var(--text-medium-min) * 1rem), calc((var(--text-medium-min) - (var(--text-medium-max) - var(--text-medium-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * var(--site-viewport-min)) * 1rem + (var(--text-medium-max) - var(--text-medium-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * 100vw), calc(var(--text-medium-max) * 1rem));
   --text-medium--font-weight: 400;
-  --text-medium--line-height: 1.5;
-  --text-medium--letter-spacing: 0;
+  --text-medium--line-height: 1;
+  --text-medium--letter-spacing: -0.03em;
 
   --text-main: clamp(calc(var(--text-main-min) * 1rem), calc((var(--text-main-min) - (var(--text-main-max) - var(--text-main-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * var(--site-viewport-min)) * 1rem + (var(--text-main-max) - var(--text-main-min)) / (var(--site-viewport-max) - var(--site-viewport-min)) * 100vw), calc(var(--text-main-max) * 1rem));
   --text-main--font-weight: 400;
@@ -101,6 +101,9 @@
   --text-small--font-weight: 400;
   --text-small--line-height: 1.4;
   --text-small--letter-spacing: 0;
+
+  /* Font family — only Medium (500) is shipped; other weights synthesize */
+  --font-primary: 'Neue Haas Grotesk Display', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 
   /* Font weights */
   --font-weight-thin: 200;

@@ -7,14 +7,14 @@
 
 .u-theme-light {
   --color-bg: #ffffff;
-  --color-fg: #353233;
+  --color-fg: #131313;
   --color-line: rgb(53 50 51 / 0.1);
   --color-link-fg: #353233;
   --color-link-fg-hover: #ffffff;
 }
 
 .u-theme-dark {
-  --color-bg: #353233;
+  --color-bg: #131313;
   --color-fg: #ffffff;
   --color-line: rgb(255 255 255 / 0.1);
   --color-link-fg: #ffffff;

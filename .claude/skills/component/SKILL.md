@@ -32,7 +32,7 @@ app/components/
     Logo.vue
     Theme.vue
   Wrapper/       — layout primitives
-    Container.vue
+    Container.vue  — margin-based grid container; see the `layout` skill
   GridGuide.vue  — dev tools (Shift+G overlay)
 ```
 

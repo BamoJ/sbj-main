@@ -1,39 +1,7 @@
 @font-face {
-  font-family: 'Helvetica Neue LT';
-  src: url('../fonts/Helvetica-Neue-LT-35-Thin.woff2') format('woff2');
-  font-weight: 200;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Helvetica Neue LT';
-  src: url('../fonts/Helvetica-Neue-LT-45-Light.woff2') format('woff2');
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Helvetica Neue LT';
-  src: url('../fonts/Helvetica-Neue-LT-55-Roman.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Helvetica Neue LT';
-  src: url('../fonts/Helvetica-Neue-LT-65-Medium.woff2') format('woff2');
+  font-family: 'Neue Haas Grotesk Display';
+  src: url('../fonts/NeueHaasGroteskDisplay-Medium.woff2') format('woff2');
   font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Helvetica Neue LT';
-  src: url('../fonts/Helvetica-Neue-LT-75-Bold.woff2') format('woff2');
-  font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
