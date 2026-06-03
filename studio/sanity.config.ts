@@ -4,14 +4,14 @@ import { visionTool } from '@sanity/vision'
 import { orderableDocumentListDeskItem } from '@sanity/orderable-document-list'
 import { schemaTypes } from './schemas'
 
-// Per-client config — projectId/dataset come from the env so the same
-// Studio code can serve any client. Drop the values into .env when wiring.
+// bamoj.com's Sanity project — projectId/dataset are public, hardcoded here
+// (and in the frontend nuxt.config) so there's no .env to keep in sync.
 export default defineConfig({
   name: 'default',
   title: 'Studio•Bämo.J®',
 
-  projectId: process.env.SANITY_STUDIO_PROJECT_ID!,
-  dataset: process.env.SANITY_STUDIO_DATASET || 'production',
+  projectId: '7ysaqk08',
+  dataset: 'production',
 
   // "Projects" is a drag-to-reorder list (orderableDocumentListDeskItem) —
   // the order set here drives the work-index numbering on the site.

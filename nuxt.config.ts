@@ -86,12 +86,13 @@ export default defineNuxtConfig({
     ],
   },
 
-  // Sanity — projectId pulled from .env so the starter is portable.
-  // Each client gets their own cloud project; only env vars change.
-  // useCdn: true is the cheap/fast path for public read queries.
+  // Sanity — hardcoded for bamoj.com. The projectId + dataset are PUBLIC
+  // (they ship in the client bundle for CDN reads), so they live here instead
+  // of .env — no env juggling across the frontend + studio. useCdn: true is
+  // the cheap/fast path for public read queries.
   sanity: {
-    projectId: process.env.NUXT_PUBLIC_SANITY_PROJECT_ID || '',
-    dataset: process.env.NUXT_PUBLIC_SANITY_DATASET || 'production',
+    projectId: '7ysaqk08',
+    dataset: 'production',
     apiVersion: '2025-05-20',
     useCdn: true,
   },
@@ -103,7 +104,7 @@ export default defineNuxtConfig({
   // no idea what `provider="sanity"` means → render crash.
   image: {
     sanity: {
-      projectId: process.env.NUXT_PUBLIC_SANITY_PROJECT_ID || '',
+      projectId: '7ysaqk08',
     },
   },
 
