@@ -105,7 +105,8 @@ export function useDOMPlane(elementRef, textureUrl, options = {}) {
       const target = elementRef.value
       if (!target) return
       const mat = cur.material
-      mat.uniforms.uTime.value = canvas.time.elapsed
+      // `time.elapsed` is ms now (Time is ms-based); shaders want seconds.
+      mat.uniforms.uTime.value = canvas.time.seconds
       syncPosition(cur, target)
     }
     emitter.on('webgl:tick', rafCallback)

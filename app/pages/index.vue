@@ -103,7 +103,7 @@ useAnims()
               </div>
 
               <div class="flex flex-col h-full justify-between pt-[2em]">
-                <span class="text-large leading-[1.1]" data-anim>
+                <span class="text-large leading-[1.1]">
                   Studio•Bämo.J® is an independent creative studio with a primary focus on bespoke
                   web experiences, digital design, motion–interaction and development delivering
                   bespoke — digital craftsmanship.

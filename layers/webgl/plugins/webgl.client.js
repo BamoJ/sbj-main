@@ -1,7 +1,8 @@
-import { Clock, Mesh, PerspectiveCamera, PlaneGeometry, Scene, ShaderMaterial, SRGBColorSpace, WebGLRenderer } from 'three'
+import { Mesh, PerspectiveCamera, PlaneGeometry, Scene, ShaderMaterial, SRGBColorSpace, WebGLRenderer } from 'three'
 import { gsap } from 'gsap'
 import { isMobile } from '~/utils/media'
 import { emitter } from '~/utils/Emitter'
+import Time from '../utils/Time'
 import { registerTransitionMesh } from '../composables/usePageTransition'
 
 // Default disabled context — destructuring at call sites never throws.
@@ -10,7 +11,7 @@ function makeDisabledContext() {
     enabled: false,
     viewport: { width: 0, height: 0 },
     screen: { width: 0, height: 0 },
-    time: { delta: 0, elapsed: 0, current: 0 },
+    time: { delta: 0, elapsed: 0, current: 0, seconds: 0 },
     ready: ref(false),
     mount: () => {},
     unmount: () => {},
@@ -73,10 +74,9 @@ export default defineNuxtPlugin({
 
     const viewport = { width: 0, height: 0 }
     const screen = { width: 0, height: 0 }
-    const time = { delta: 0, elapsed: 0, current: 0 }
+    const time = new Time()
     const ready = ref(false)
     const pages = new Set()
-    const clock = new Clock()
 
     // Wrapped in an object so reassignment inside mount() propagates to
     // `$webgl.renderer` via the getter below.
@@ -153,17 +153,14 @@ export default defineNuxtPlugin({
       createPlaceholder()
 
       // Share gsap.ticker with Lenis + ScrollTrigger so all animation systems
-      // advance in the same frame and never tear.
-      clock.start()
-      tickerCallback = (rawTime) => {
-        const delta = clock.getDelta()
-        time.delta = delta
-        time.elapsed = clock.elapsedTime
-        time.current = rawTime
+      // advance in the same frame and never tear. Time is driven off this same
+      // tick (it owns no RAF of its own) — see layers/webgl/utils/Time.js.
+      tickerCallback = () => {
+        time.tick()
         if (state.placeholder) {
-          state.placeholder.material.uniforms.uTime.value = time.elapsed
+          state.placeholder.material.uniforms.uTime.value = time.seconds
         }
-        emitter.emit('webgl:tick', { delta, elapsed: time.elapsed })
+        emitter.emit('webgl:tick', { delta: time.delta, elapsed: time.elapsed })
         pages.forEach((page) => page.update?.(time))
         renderer.render(scene, camera)
       }
@@ -181,6 +178,7 @@ export default defineNuxtPlugin({
         gsap.ticker.remove(tickerCallback)
         tickerCallback = null
       }
+      time.stop()
       if (resizeHandler) {
         window.removeEventListener('resize', resizeHandler)
         resizeHandler = null
