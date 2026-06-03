@@ -3,7 +3,7 @@ import Container from '~/components/Wrapper/Container.vue'
 
 // One-page homepage / work index for the bamoj.com placeholder.
 useSanitySeo('home', {
-  title: 'Home',
+  title: 'Studio•Bamo.J®',
   description:
     'The portfolio of Bamo.J® — a creative studio working at the intersection of design, motion, and code.',
   ogType: 'website',
@@ -47,6 +47,14 @@ useAnims()
           :class="isOpen ? 'pointer-events-auto' : 'pointer-events-none'"
           class="relative w-1/2 h-full bg-black pt-2 transform-gpu"
         >
+          <div class="absolute top-0 left-0 w-full h-full pointer-events-none">
+            <NuxtImg
+              src="/images/menu-bg.png"
+              alt=""
+              aria-hidden="true"
+              class="w-full h-full object-cover opacity-50"
+            />
+          </div>
           <Container class="h-full">
             <div class="w-full h-full flex flex-col px-[1em]">
               <div class="w-full flex flex-row justify-between relative pb-[1em]">

@@ -30,8 +30,8 @@ export default defineNuxtConfig({
     url: process.env.NUXT_PUBLIC_SITE_URL || 'http://localhost:3000',
     name: process.env.NUXT_PUBLIC_SITE_NAME || 'Studio•Bamo.J®',
     description:
-      process.env.NUXT_PUBLIC_SITE_DESCRIPTION
-      || 'A creative studio building distinctive digital experiences with motion, type, and WebGL.',
+      process.env.NUXT_PUBLIC_SITE_DESCRIPTION ||
+      'A creative studio building distinctive digital experiences with motion, type, and WebGL.',
     defaultLocale: 'en',
   },
 
@@ -122,8 +122,18 @@ export default defineNuxtConfig({
   // resolves to <title>Home — Studio•Bamo.J®</title>.
   app: {
     head: {
-      titleTemplate: '%s — Studio•Bamo.J®',
+      // `title` is the static default baked into the SPA shell → no
+      // "— Studio•Bamo.J®" flash before hydration. `titleTemplate: '%s'` is an
+      // explicit identity template that stops @nuxtjs/seo from injecting its
+      // own default ("%s | %siteName" — where %siteName leaks unresolved).
+      // When subpages land, swap '%s' for a function titleTemplate in app.vue
+      // (`t => t ? `${t} — Studio•Bamo.J®` : 'Studio•Bamo.J®'`) for the suffix.
+      title: 'Studio•Bamo.J®',
+      titleTemplate: '%s',
       htmlAttrs: { lang: 'en' },
+      // Favicon lives at public/sbj-favicon.ico. The ?v= query busts the
+      // browser's aggressive favicon cache; bump it whenever the icon changes.
+      link: [{ rel: 'icon', type: 'image/x-icon', href: '/sbj-fav.svg' }],
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'theme-color', content: '#353233' },
