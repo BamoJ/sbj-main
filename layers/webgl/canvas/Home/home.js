@@ -22,7 +22,7 @@ export class Home extends Page {
       maxDisplacement: 500, // hard cap on roam — keeps the LOGO readable. ↑ = looser
       returnForce: 0.12, // spring-home strength — holds the shape
       damping: 0.9, // viscosity (gooey = high)
-      flowStrength: 0.005, // ambient curl-noise drift — gentle goo, not a flood (0 = off)
+      flowStrength: 0, // ambient curl-noise drift OFF — interaction is hover-only (0 = off, skips the curl taps via the shader guard)
       flowScale: 0.0022, // eddy size (smaller = bigger, slower swirls)
       pointSize: 5,
       fit: 'cover', // 'cover' = fill screen, keep proportions (crop overflow) |

@@ -81,8 +81,11 @@ void main() {
 
   // Ambient curl-noise flow — gives the field a continuous, fluid drift instead
   // of stiff straight-line returns. Animated over time so it never settles dead.
-  vec2 fp = pos * uFlowScale + vec2(uTime * 0.06, uTime * 0.05);
-  vel += curlFlow(fp) * uFlowStrength;
+  // Gated: when flow is off (uFlowStrength == 0) the 4 simplex taps are skipped.
+  if (uFlowStrength > 0.0001) {
+    vec2 fp = pos * uFlowScale + vec2(uTime * 0.06, uTime * 0.05);
+    vel += curlFlow(fp) * uFlowStrength;
+  }
 
   // Damping.
   vel *= uDamping;
