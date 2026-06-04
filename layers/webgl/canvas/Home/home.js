@@ -24,7 +24,7 @@ export class Home extends Page {
       damping: 0.9, // viscosity (gooey = high)
       flowStrength: 0.005, // ambient curl-noise drift — gentle goo, not a flood (0 = off)
       flowScale: 0.0022, // eddy size (smaller = bigger, slower swirls)
-      pointSize: 10,
+      pointSize: 5,
       fit: 'cover', // 'cover' = fill screen, keep proportions (crop overflow) |
       //               'contain' = whole design visible (letterbox) | 'stretch' = warp to fill
       scale: 1.0, // zoom multiplier on top of the fit (1 = exact fit, >1 zooms in)

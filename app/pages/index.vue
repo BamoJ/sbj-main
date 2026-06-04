@@ -222,7 +222,7 @@ useAnims()
                     <span class="text-main col-span-1">{{ project.role }}</span>
                     <span class="text-main col-span-1 max-md:col-start-6">{{ project.year }}</span>
                     <div class="absolute bottom-0 w-full h-[1px] col-span-5">
-                      <div class="w-full h-full bg-white opacity-10"></div>
+                      <div class="w-full h-full bg-white opacity-20"></div>
                     </div>
                   </component>
                 </div>

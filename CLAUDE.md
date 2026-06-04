@@ -25,17 +25,16 @@ Per-page SEO is `useSanitySeo(slug, defaults)` defaults only — the old Sanity 
 ## Run it
 
 ```bash
-bun install
-cd layers/webgl && bun install   # REQUIRED: `three` is in the layer's package.json, not root
-cd .. && bun run dev             # frontend → :3000
+bun install                      # root is a bun workspace (`workspaces: ["layers/*"]`) → fetches `three` from the webgl layer too
+bun run dev                      # frontend → :3000
 cd studio && bun run dev         # studio   → :3333
 ```
 
 ## Gotchas (learned wiring this project)
 
-- **`three` lives in `layers/webgl/package.json`** — root `bun install` does NOT fetch it. Run `cd layers/webgl && bun install` or the dev server errors `Unresolvable optimizeDeps: three`.
+- **`three` lives in `layers/webgl/package.json`** — root `package.json` declares `workspaces: ["layers/*"]` so a single root `bun install` hoists `three` (and any future layer deps) to root `node_modules`. This is also what makes Vercel work — it only installs at the repo root. Without the workspaces field the build errors `Unresolvable optimizeDeps: three`. The root `bun.lock` MUST contain `three` (Vercel installs with `--frozen-lockfile`); re-run `bun install` and commit the lockfile after touching layer deps.
 - **Use `npx sanity`, not `bunx sanity`** — the bun-installed Sanity CLI is broken (missing `term-size` vendor binary) and login won't persist.
-- **Browser reads need a CORS origin** — add `http://localhost:3000` (and the prod domain at deploy) under sanity.io/manage → API → CORS Origins, or the frontend's Sanity queries are blocked.
+- **Browser reads need a CORS origin** — the app is SPA (`ssr: false`), so Sanity queries run in the visitor's browser from the deployed origin. Each origin must be allowlisted under sanity.io/manage → project `7ysaqk08` → API → CORS Origins (no "Allow credentials" — reads are public/token-less), or queries return `403` + `No 'Access-Control-Allow-Origin'`. Currently allowlisted: `http://localhost:3000`, `https://sbj-main.vercel.app`, `https://bamoj.com`, `https://www.bamoj.com`. Per-deploy Vercel preview URLs (`sbj-main-<hash>.vercel.app`) are NOT allowlisted, so CMS data only loads on the stable domains.
 - **Env is read at boot** — after editing `.env` / `studio/.env`, restart the dev server (and the Studio).
 - **Don't let Sanity crash app init** — `app/composables/useSanitySeo.js` guards `useSanity()` behind a `projectId` check, and `app/plugins/sanity-prefetch.client.js` wraps its fetch in try/catch. Without these, an unconfigured project or a CORS-blocked fetch produces a 500. Keep them.
 
