@@ -2,6 +2,7 @@
   "name": "sbj-nuxt-starter",
   "type": "module",
   "private": true,
+  "workspaces": ["layers/*"],
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
