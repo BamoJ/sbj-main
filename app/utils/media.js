@@ -13,6 +13,15 @@ export function isTabletOrBelow() {
 }
 
 /**
+ * Returns true on touch / no-mouse devices (phones + tablets). Used as the WebGL
+ * capability gate — the particle effect is cursor-driven, so touch devices get
+ * the static fallback regardless of viewport width.
+ */
+export function isTouch() {
+  return window.matchMedia('(hover: none), (pointer: coarse)').matches
+}
+
+/**
  * Returns true on mobile devices, detected via UA sniffing + viewport width.
  */
 export function isMobile() {

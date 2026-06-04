@@ -1,10 +1,16 @@
 ---
 name: webgl-page
-description: Optional per-page WebGL hooks. Use only when a page needs its own WebGL behaviour beyond the always-on placeholder mesh — e.g., custom per-frame updates, raycaster hover, or mesh-flight.
+description: "(reference / future — not in the current build) The old per-page WebGL hook (useWebGLPage). Removed; today a page's WebGL behaviour is a Page subclass — see webgl-canvas. Kept for reference."
 user-invokable: true
 ---
 
-# WebGL Page — optional per-page registration
+> ⚠️ **Reference pattern — NOT in the current build.** `useWebGLPage`, `usePageTransition`,
+> and the placeholder mesh described below were **removed** when the WebGL layer went
+> class-based. Today, per-page WebGL behaviour is a **`Page` subclass** registered in
+> `canvas/registry.js` — see [webgl-canvas](../webgl-canvas/SKILL.md) → "Add a view".
+> Kept for reference / a future port. Nothing below matches today's code.
+
+# WebGL Page — optional per-page registration  *(reference)*
 
 ## The default
 

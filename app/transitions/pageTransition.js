@@ -21,8 +21,6 @@ export const pageTransition = {
     // page swap (mesh fade out, scroll pause, preloader, etc.). No-op when
     // the layer is absent — nobody is listening.
     emitter.emit('transition:start', { direction: 'leave' })
-    // Layer composable fades active meshes out via the same call.
-    usePageTransition().prepareTransition()
 
     gsap.to(el, {
       opacity: 0,
@@ -50,6 +48,16 @@ export const pageTransition = {
   },
 
   async onEnter(el, done) {
+    // Swap the WebGL view to match the incoming route. `el` is the new page's
+    // mounted DOM, so DOM-driven views can read it. No-op on mobile/layer-off.
+    const { $webgl } = useNuxtApp()
+    $webgl?.onChange?.(useRoute().name, el)
+
+    // Cross-page plane flight. DORMANT: only runs when a source page has staged a
+    // mesh (via `webgl:transition:prepare`) AND the destination has [data-gl-target].
+    // No markup ⇒ no-op. See the `transition` skill.
+    runPlaneFlight($webgl, el)
+
     const finish = () => {
       gsap.set(el, { clearProps: 'all' })
       window.scrollTo(0, 0)
@@ -153,9 +161,26 @@ export const pageTransition = {
       ease: 'power2.out',
       delay: delay + 0.25,
     })
-
-    // WebGL meshes enter at the same beat as the chars — uReveal flutter from
-    // sharedVert.glsl + uOpacity fade-in. No-op when the layer is off / mobile.
-    usePageTransition().enterTransition(delay)
   },
+}
+
+// Cross-page WebGL plane flight (ported minimal `ProjectTrans`). Runs ONLY when a
+// source page staged a mesh via `webgl:transition:prepare` AND the destination has
+// a `[data-gl-target]` element. Both absent today ⇒ this is a guaranteed no-op.
+// When a real image-plane page exists, it'll stage the mesh and this flies it.
+const FLIGHT = 1.5
+function runPlaneFlight($webgl, el) {
+  const tc = $webgl?.transition
+  if (!tc?.staged) return
+  const target = el.querySelector('[data-gl-target]')
+  if (!target) { tc.cleanup?.(); return } // staged but nowhere to land — drop it
+  const ctx = tc.getFlightContext(target.getBoundingClientRect())
+  if (!ctx) return
+
+  const u = ctx.uniforms
+  const tl = gsap.timeline({ onComplete: () => ctx.cleanup() })
+  tl.to(ctx.mesh.position, { x: ctx.world.x, y: ctx.world.y, duration: FLIGHT, ease: 'expo.inOut' }, 0)
+  tl.to(ctx.sizeProxy, { width: ctx.world.width, height: ctx.world.height, progress: 1, duration: FLIGHT, ease: 'expo.inOut', onUpdate: ctx.onSizeUpdate }, 0)
+  if (u?.uPageTransition) tl.to(u.uPageTransition, { value: 1, duration: FLIGHT, ease: 'power1.inOut' }, 0)
+  if (u?.uOpacity) tl.to(u.uOpacity, { value: 0, duration: FLIGHT * 0.2, ease: 'power2.inOut' }, FLIGHT * 0.8)
 }

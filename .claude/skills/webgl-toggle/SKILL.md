@@ -1,98 +1,77 @@
 ---
 name: webgl-toggle
-description: Enable or disable the WebGL layer in this starter. The placeholder mesh ships ON by default; this skill documents the manual procedure to turn it off (and back on later) without touching the layer's internals.
+description: How the WebGL layer turns itself on/off (capability gate + the reactive 768px breakpoint switch with a static BG fallback) and the manual procedure to remove the layer entirely. Use to change the breakpoint, understand the desktop↔mobile swap, or strip WebGL from a project.
 user-invokable: true
 ---
 
-# WebGL toggle — turn the layer on or off
+# WebGL toggle — automatic switch + manual removal
 
-## Default state (no work)
+WebGL is **ON** by default, but it gates itself two ways before anything renders. Read
+[webgl-canvas](../webgl-canvas/SKILL.md) for the architecture.
 
-WebGL is **ON**. The setup that ships with this starter:
+## Default wiring (what's ON)
 
-- [nuxt.config.ts](nuxt.config.ts) has `extends: ['layers/webgl']`
-- [app/app.vue](app/app.vue) renders `<WebGLCanvas />` inside `<Theme>`
-- [app/transitions/pageTransition.js](app/transitions/pageTransition.js) calls `usePageTransition().prepareTransition()` (onLeave) and `usePageTransition().enterTransition(delay)` (onEnter)
-- [layers/webgl/plugins/webgl.client.js](layers/webgl/plugins/webgl.client.js) creates a persistent placeholder mesh — subtle bottom-edge wave at rest, full-screen radial pulse during route transitions
-- Pages have **zero WebGL code** — the canvas is alive and reacts to transitions without any opt-in
+- [nuxt.config.ts](nuxt.config.ts): `extends: ['layers/webgl']`
+- [app/app.vue](app/app.vue): `<WebGLCanvas />` inside `<Theme>` + `<NuxtPage :transition="pageTransition" />`
+- [app/transitions/pageTransition.js](app/transitions/pageTransition.js): `onEnter` → `$webgl.onChange(useRoute().name, el)` (view swap)
+- [app/pages/index.vue](app/pages/index.vue): `showLogoFallback = computed(() => !webgl?.activeRef?.value)` → shows the static `texture.png` BG when WebGL isn't active.
 
-If a page wants its own image-driven WebGL effects, opt in via `useDOMPlane` per page (see [webgl-dom-page](../webgl-dom-page/SKILL.md)). DOMPlane is opt-in per page; doesn't require toggling the whole layer.
+## Automatic gating (no edits needed)
 
-## Turning WebGL OFF
+Both live in [layers/webgl/plugins/webgl.client.js](layers/webgl/plugins/webgl.client.js):
 
-Four manual edits — this is the intended workflow. No script, no flag, no branch. Pages already have zero WebGL code, so there's nothing to undo there.
+1. **Capability gate** — `if (prefersReducedMotion() || isTouch())` (from
+   [app/utils/media.js](app/utils/media.js)) → provides a disabled stub `$webgl`
+   (`enabled:false`, `activeRef: ref(false)`); **no Three.js is built**. Touch devices and
+   reduced-motion users get the static BG, always. Fixed per device.
+2. **Responsive switch** — a reactive `activeRef` tied to
+   `matchMedia('(min-width: 768px)')`. `WebGLCanvas.vue` builds on first activation, then
+   `v-show` + `setRenderActive()` show/hide + pause/resume the render loop as the viewport
+   crosses the breakpoint. `index.vue` flips to the BG when `!activeRef`. **Instant, on
+   resize, no reload.**
 
-### 1. Remove the layer extension
+Net: desktop ≥768px → particles; <768px / touch / reduced-motion → static `texture.png`.
 
-[nuxt.config.ts](nuxt.config.ts):
-
-```ts
-// extends: ['layers/webgl'],   ← delete or comment out
+### Change the breakpoint
+Edit the `BREAKPOINT` string in `webgl.client.js`:
+```js
+const BREAKPOINT = '(min-width: 768px)'   // ← e.g. 1024px to disable on tablets too
 ```
 
-### 2. Remove the canvas component
+### Change what counts as "no WebGL"
+Edit the capability gate. `isTouch()` = `matchMedia('(hover: none), (pointer: coarse)')`.
+Drop `isTouch()` to run on touch devices; add other conditions as needed.
 
-[app/app.vue](app/app.vue) — delete the `<WebGLCanvas />` line and its comment:
+## Removing the layer entirely (hard off)
 
-```diff
- <template>
-   <Theme class="u-theme-dark">
--    <!-- Persistent WebGL canvas from layers/webgl/ ... -->
--    <WebGLCanvas />
-     <MainNav />
-     <main>
-       <NuxtPage :transition="pageTransition" />
-     </main>
-   </Theme>
-   <GridGuide />
- </template>
-```
+For a project that wants no WebGL at all:
 
-### 3. Remove the transition hooks
+1. **nuxt.config.ts** — delete `extends: ['layers/webgl']`.
+2. **app/app.vue** — delete `<WebGLCanvas />`.
+3. **app/transitions/pageTransition.js** — in `onEnter`, delete the
+   `const { $webgl } = useNuxtApp(); $webgl?.onChange?.(useRoute().name, el)` lines. Keep
+   the `emitter.emit('transition:start' | 'transition:complete')` signals.
+4. **app/pages/index.vue** — `useWebGL()` is a layer composable, so it disappears with the
+   layer. Drop `const webgl = useWebGL()` and hard-set `const showLogoFallback = true` (or
+   just always render the `<NuxtImg src="/images/texture.png">`). The static BG becomes the
+   permanent hero.
+5. **(optional)** `rm -rf layers/webgl && bun install` — drops `three` from the bundle.
 
-[app/transitions/pageTransition.js](app/transitions/pageTransition.js):
+Result: pure GSAP / Lenis / Sanity Nuxt starter, no Three.js, the `texture.png` hero
+everywhere. Transitions still run (DOM only).
 
-- In `onLeave`, delete the `usePageTransition().prepareTransition()` line.
-- In `onEnter` (near the end, after the gsap timeline calls), delete the `usePageTransition().enterTransition(delay)` line.
+## Turning it back on
+Reverse steps 1–4 (restore `extends`, `<WebGLCanvas />`, the `$webgl.onChange` call in
+`onEnter`, and `index.vue`'s `useWebGL()` + reactive `showLogoFallback`). If you deleted
+`layers/webgl/`, restore it from git, then `bun install`.
 
-Keep the two `emitter.emit('transition:start' | 'transition:complete')` calls — useful signals regardless of WebGL.
-
-### 4. (Optional) Remove the layer folder + three.js
-
-```bash
-rm -rf layers/webgl
-bun install   # drops three from node_modules
-```
-
-### Result
-
-Pure GSAP / Lenis / Sanity Nuxt starter. No three.js in the bundle. Transitions still work — they just don't have the WebGL pulse.
-
-If a project later adds `useDOMPlane` calls to specific pages, those calls + their wrapper divs also need removing during step 4. The default starter doesn't have any, so this only applies to projects that opted in.
-
-## Turning WebGL back ON
-
-If you turned it off earlier and want it back:
-
-1. Restore `extends: ['layers/webgl']` in [nuxt.config.ts](nuxt.config.ts).
-2. Restore `<WebGLCanvas />` in [app/app.vue](app/app.vue) (inside `<Theme>`, before `<MainNav />`).
-3. Restore the two `usePageTransition()` calls in [pageTransition.js](app/transitions/pageTransition.js):
-   - `onLeave`: `usePageTransition().prepareTransition()`
-   - `onEnter`: `usePageTransition().enterTransition(delay)` at the end
-4. If you deleted `layers/webgl/`, restore from git history or copy from the starter again.
-5. `bun install` to pick up `three`.
-
-## Mobile bypass (automatic — no toggle needed)
-
-The plugin checks `isMobile()` at boot. Viewport `≤ 768px` skips Three.js entirely — no scene, no renderer, no RAF subscriptions. The toggle above is for the desktop default. Mobile bypass is automatic regardless of toggle state.
-
-## Manual removal only — no script
-
-There is **no** `bun run disable-webgl` script and none is planned. The four edits above are the entire procedure; the touch points are small and stable, so a script would be overhead without payoff. If a future project needs WebGL off, follow the steps above manually and commit the result.
+## Notes
+- No `bun run disable-webgl` script — the edits above are the whole procedure and the
+  touch points are small/stable.
+- `three` lives in `layers/webgl/package.json`; after restoring the layer run
+  `cd layers/webgl && bun install` (see CLAUDE.md gotchas).
 
 ## Cross-references
-
-- [new-project](../new-project/SKILL.md) — when to make the on/off decision during scaffolding
-- [transition](../transition/SKILL.md) — what the on-state does during route changes
-- [dom-plane](../dom-plane/SKILL.md) — opt-in per-page DOMPlane usage (separate concept from the layer toggle)
-- [canvas-nav](../canvas-nav/SKILL.md) — what stays in the scene with the layer enabled
+- [webgl-canvas](../webgl-canvas/SKILL.md) — architecture
+- [transition](../transition/SKILL.md) — what `onChange` does during nav
+- [new-project](../new-project/SKILL.md) — the keep/remove decision during scaffolding

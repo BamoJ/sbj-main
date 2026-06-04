@@ -1,6 +1,16 @@
 <script setup>
 import Container from '~/components/Wrapper/Container.vue'
 
+// Route name = registry key in layers/webgl/canvas/registry.js. The WebGL
+// stage swaps to the Home view when this route is entered.
+definePageMeta({ name: 'home' })
+
+// Show the static home background whenever the WebGL particles aren't active —
+// touch / reduced-motion (never active) or viewport below the breakpoint.
+// Reactive, so it swaps live on resize.
+const webgl = useWebGL()
+const showLogoFallback = computed(() => !webgl?.activeRef?.value)
+
 // One-page homepage / work index for the bamoj.com placeholder.
 useSanitySeo('home', {
   title: 'Studio•Bamo.J®',
@@ -30,12 +40,14 @@ useAnims()
 <template>
   <div>
     <section class="relative">
-      <img
+      <NuxtImg
+        v-if="showLogoFallback"
         src="/images/texture.png"
         alt=""
         aria-hidden="true"
         class="pointer-events-none absolute inset-0 h-full w-full object-cover"
       />
+
       <div
         data-menu
         class="absolute inset-0 w-full h-full z-[1000] flex flex-row justify-end pointer-events-none"
@@ -45,7 +57,7 @@ useAnims()
           data-menu-panel
           :data-open="isOpen"
           :class="isOpen ? 'pointer-events-auto' : 'pointer-events-none'"
-          class="relative w-1/2 h-full bg-black pt-2 transform-gpu"
+          class="relative w-1/2 h-full bg-black pt-2 transform-gpu max-md:w-full"
         >
           <div class="absolute top-0 left-0 w-full h-full pointer-events-none">
             <NuxtImg
@@ -104,9 +116,9 @@ useAnims()
 
               <div class="flex flex-col h-full justify-between pt-[2em]">
                 <span class="text-large leading-[1.1]">
-                  Studio•Bämo.J® is an independent creative studio with a primary focus on bespoke
-                  web experiences, digital design, motion–interaction and development delivering
-                  bespoke — digital craftsmanship.
+                  Studio•Bämo.J® is an independent creative studio with a primary focus on web
+                  experiences, digital design, motion–interaction and development delivering bespoke
+                  — digital craftsmanship.
                 </span>
                 <div class="flex flex-col w-full">
                   <div class="grid w-full grid-cols-6 w-full pt-[2em] pb-[2em] gap-gutte relative">
@@ -130,6 +142,7 @@ useAnims()
                         <li>CSSDA</li>
                         <li>Communication Arts</li>
                         <li>Codrops</li>
+                        <li>Muzli</li>
                         <li>Design Rush</li>
                       </ul>
                     </div>
@@ -166,8 +179,8 @@ useAnims()
                     <div class="absolute top-0 w-full h-[1px]">
                       <div class="w-full h-full bg-white opacity-50"></div>
                     </div>
-                    <span class="text-small">Studio•Bamo.J®</span>
-                    <span class="text-small">©2K26</span>
+                    <span class="text-small">Full website soon</span>
+                    <span class="text-small">•••</span>
                   </div>
                 </div>
               </div>
@@ -177,8 +190,10 @@ useAnims()
       </div>
       <Container class="flex h-screen min-h-screen flex-col">
         <div class="w-full flex-1 grid grid-cols-12 gap-gutter">
-          <div class="relative w-full h-full col-start-8 col-end-[13]">
-            <div class="w-full h-full flex flex-col pt-[10vh]">
+          <div
+            class="relative w-full h-full col-start-8 col-end-[13] max-md:col-start-1 max-md:col-end-[13]"
+          >
+            <div class="w-full h-full flex flex-col pt-[10vh] max-md:pt-[15vh]">
               <div class="w-full flex flex-row items-center justify-between pb-[1em] relative">
                 <span class="text-main">Selected Work</span>
                 <span class="text-main">[10]</span>
@@ -195,15 +210,17 @@ useAnims()
                     :href="project.url || undefined"
                     :target="project.url ? '_blank' : undefined"
                     :rel="project.url ? 'noopener noreferrer' : undefined"
-                    class="grid grid-cols-5 w-full items-center gap-gutter pb-[1em] pt-[1em] relative"
+                    class="grid grid-cols-5 w-full items-center gap-gutter pb-[1em] pt-[1em] relative max-md:pb-2 max-md:pt-2 max-md:grid-cols-6"
                   >
-                    <div class="project col-span-3 flex flex-row gap-[2.75em] items-start">
+                    <div
+                      class="project col-span-3 flex flex-row gap-[2.75em] items-start max-md:gap-[1em] max-md:col-span-3"
+                    >
                       <span class="text-small mt-[0.1em]">{{ i + 1 }}</span>
                       <span class="text-medium">{{ project.title }}</span>
                     </div>
 
                     <span class="text-main col-span-1">{{ project.role }}</span>
-                    <span class="text-main col-span-1">{{ project.year }}</span>
+                    <span class="text-main col-span-1 max-md:col-start-6">{{ project.year }}</span>
                     <div class="absolute bottom-0 w-full h-[1px] col-span-5">
                       <div class="w-full h-full bg-white opacity-10"></div>
                     </div>
@@ -213,19 +230,25 @@ useAnims()
             </div>
           </div>
         </div>
-        <div class="bottom w-full grid grid-cols-12 gap-gutter absolute bottom-0 left-0 pb-4">
-          <div class="col-start-1">©2K26</div>
-          <div class="col-start-5 flex flex-row gap-1">
+        <div
+          class="bottom w-full grid grid-cols-12 gap-gutter absolute bottom-0 left-0 pb-4 max-md:text-small"
+        >
+          <div class="col-start-1 max-md:hidden">©2K26</div>
+          <div class="col-start-5 flex flex-row gap-1 max-md:hidden">
             <span>Jkt</span>
             <span>/</span>
             <span>Bali</span>
           </div>
-          <div class="col-start-8 flex flex-row gap-12">
+          <div
+            class="col-start-8 flex flex-row gap-12 max-md:col-start-1 max-md:col-end-[5] gap-gutter"
+          >
             <TextLink v-for="social in settings?.socials" :key="social.url" :href="social.url">
               {{ social.label }}
             </TextLink>
           </div>
-          <div class="col-start-12">
+          <div
+            class="col-start-12 max-md:col-satrt-5 max-md:col-end-[13] flex flex-row justify-end gap-1"
+          >
             <TextLink href="https://cal.com/bamoj/discovery-session">Booking</TextLink>
           </div>
         </div>

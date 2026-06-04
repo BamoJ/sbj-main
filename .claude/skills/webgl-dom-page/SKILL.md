@@ -1,10 +1,15 @@
 ---
 name: webgl-dom-page
-description: Pattern for mapping a DOM image to a WebGL plane on a specific page. OPTIONAL helper — only use when a page needs image-driven WebGL (hero with shader effects, gallery, etc.). Default WebGL is the always-on placeholder; pages don't need this for transitions to work.
+description: "(reference / future — not in the current build) Pattern for mapping a DOM image to a WebGL plane on a specific page. Overlaps with dom-plane; both document the removed useDOMPlane pattern, kept for a future project."
 user-invokable: true
 ---
 
-# WebGL DOM Page — optional pattern for image-driven WebGL
+> ⚠️ **Reference pattern — NOT in the current build.** Documents the removed
+> `useDOMPlane` image-plane pattern (gone since the WebGL layer went class-based — see
+> [webgl-canvas](../webgl-canvas/SKILL.md)). Kept for a **future project**; overlaps with
+> [dom-plane](../dom-plane/SKILL.md) (the canonical reference). Nothing below matches today's code.
+
+# WebGL DOM Page — optional pattern for image-driven WebGL  *(reference)*
 
 ## When you need this
 

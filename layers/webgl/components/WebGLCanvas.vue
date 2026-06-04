@@ -1,25 +1,41 @@
 <script setup>
-// Mounts the persistent <canvas> the renderer draws into. Lives once in the
-// app shell (app.vue) so the GL context survives <NuxtPage> route changes.
-// On mobile (or when the plugin disabled itself), this becomes a no-op:
-// the <canvas> still renders but the plugin never attaches a renderer.
-const canvasEl = ref(null)
-const { enabled, mount, unmount } = useCanvas()
+// The persistent stage container. Lives once in app.vue so the GL context
+// survives <NuxtPage> route changes.
+//
+// `activeRef` (viewport ≥ breakpoint) drives the live swap: the first time it's
+// true we build the renderer + enter the page (once), then we just pause/resume
+// rendering and show/hide the canvas via v-show as the viewport crosses the
+// breakpoint — the GL context is kept alive so the swap is instant. On touch /
+// reduced-motion `enabled` is false and this never builds (the home BG shows).
+const container = ref(null)
+const route = useRoute()
+const webgl = useWebGL()
+const active = computed(() => webgl?.activeRef?.value ?? false)
 
-onMounted(() => {
-  if (!enabled || !canvasEl.value) return
-  mount(canvasEl.value)
-})
+let built = false
+function syncActive(on) {
+  if (!webgl?.enabled || !container.value) return
+  if (on && !built) {
+    webgl.mount(container.value)
+    webgl.onChange(route.name)
+    built = true
+  }
+  webgl.setRenderActive?.(on)
+}
+
+onMounted(() => syncActive(active.value))
+watch(active, syncActive)
 
 onBeforeUnmount(() => {
-  if (!enabled) return
-  unmount()
+  if (!webgl?.enabled) return
+  webgl.unmount?.()
 })
 </script>
 
 <template>
-  <canvas
-    ref="canvasEl"
+  <div
+    v-show="active"
+    ref="container"
     class="webgl-canvas"
     aria-hidden="true"
   />
@@ -33,5 +49,11 @@ onBeforeUnmount(() => {
   height: 100vh;
   pointer-events: none;
   z-index: 0;
+}
+
+.webgl-canvas :deep(canvas) {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
 }
 </style>

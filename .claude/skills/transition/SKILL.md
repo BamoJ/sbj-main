@@ -1,89 +1,104 @@
 ---
 name: transition
-description: Nuxt page transitions + the WebGL placeholder mesh that reacts to route changes. Use when adjusting cross-page choreography, debugging hero-text/SplitText timing, or wiring optional DOMPlane meshes into the transition.
+description: Nuxt page transitions (GSAP clip-path + SplitText hero) and how they drive the WebGL view swap via $webgl.onChange. Use when adjusting cross-page choreography, debugging hero-text timing, or planning a cross-page WebGL plane transition.
 user-invokable: true
 ---
 
-# Transition — Nuxt page transitions + WebGL placeholder reaction
+# Transition — Nuxt page transitions + WebGL view swap
 
 ## Architecture
 
-Three systems collaborate on every route change:
+On every route change:
 
-1. **Nuxt page transition** ([app/transitions/pageTransition.js](app/transitions/pageTransition.js)) — Vue Transition hooks driven by GSAP. Authoritative for DOM choreography (clip-path reveal, SplitText hero, BG scale, page number).
-2. **WebGL placeholder mesh** ([layers/webgl/plugins/webgl.client.js](layers/webgl/plugins/webgl.client.js)) — a persistent fullscreen plane created once at boot. Baseline = subtle bottom-edge wave. During transitions = full-screen radial pulse. Always present. Pages don't have to opt in.
-3. **`usePageTransition()`** ([layers/webgl/composables/usePageTransition.js](layers/webgl/composables/usePageTransition.js)) — drives the `uTransition` uniform on the placeholder (and any opt-in DOMPlane meshes that registered themselves).
-4. **Emitter signals** ([app/utils/Emitter.js](app/utils/Emitter.js)) — `transition:start` / `transition:complete` for any cross-system listener (preloader, cursor follower, analytics).
+1. **Nuxt page transition** ([app/transitions/pageTransition.js](app/transitions/pageTransition.js))
+   — Vue Transition hooks driven by GSAP. Authoritative for DOM choreography (clip-path
+   reveal, SplitText hero, BG scale, page number).
+2. **WebGL view swap** — `onEnter` calls `$webgl.onChange(useRoute().name, el)`, which
+   swaps the active `Page` view (see [canvas-nav](../canvas-nav/SKILL.md)). No placeholder
+   mesh, no per-mesh uniform fades — the engine just swaps which view renders.
+3. **Emitter signals** ([app/utils/Emitter.js](app/utils/Emitter.js)) — `transition:start`
+   / `transition:complete` for any cross-system listener (cursor, analytics).
 
-`useLenis()` ([app/composables/useLenis.js](app/composables/useLenis.js)) drives a single `gsap.ticker` RAF. The WebGL plugin hooks the same ticker, so Lenis + ScrollTrigger + WebGL share one frame budget.
+`useLenis()` drives a single `gsap.ticker` RAF; the WebGL plugin hooks the same ticker,
+so Lenis + ScrollTrigger + WebGL share one frame.
 
 ## The transition object
 
-`pageTransition.js` exports a plain object consumed by `<NuxtPage :transition="pageTransition" />` in app.vue.
+`pageTransition.js` exports a plain object consumed by
+`<NuxtPage :transition="pageTransition" />` in `app.vue`.
 
 ```js
 export const pageTransition = {
-  mode: 'default',   // 'default' = simultaneous (overlap). 'out-in' = sequential.
+  mode: 'default',   // simultaneous (overlap). Nuxt's default merge would force 'out-in'.
   css: false,        // GSAP owns the animation — no Vue CSS classes.
 
-  onLeave(el, done) { ... },        // emits 'transition:start' + calls prepareTransition()
-  onBeforeEnter(el) { ... },        // pin + clipPath INSET must land here
-  async onEnter(el, done) { ... },  // clip reveal + SplitText + enterTransition()
+  onLeave(el, done) { ... },        // emits 'transition:start' + fades the old page out
+  onBeforeEnter(el) { ... },        // pin + clipPath INSET must land here (pre-paint)
+  async onEnter(el, done) { ... },  // $webgl.onChange(route.name, el) + clip reveal + SplitText
 }
 ```
 
 ### Why `mode: 'default'`
-
-Nuxt's default merge would make it `'out-in'` (sequential — leave fully, then enter). `mode: 'default'` enables Vue's simultaneous mode so the new page starts revealing while the old fades — that's the cross-fade feel.
+Nuxt's default merge makes it `'out-in'` (leave fully, then enter). `'default'` enables
+Vue's simultaneous mode so the new page reveals while the old fades.
 
 ### Why `onBeforeEnter` does the pinning
-
-`onBeforeEnter` fires synchronously **before paint**. If you put `position: fixed; clipPath: inset(100% 0 0 0)` in `onEnter` instead, there's a frame where the new page paints fully visible before our styles apply → "pop" jank. The pin has to land before the browser ever paints the new page.
+`onBeforeEnter` fires synchronously **before paint**. Putting `position: fixed; clipPath:
+inset(100% 0 0 0)` in `onEnter` instead leaves a frame where the new page paints fully
+visible → "pop" jank. Pin before first paint.
 
 ## Hero choreography
 
-The hero `<h1 data-hero-title>` gets SplitText applied during `onEnter`. Two paths:
+The hero `<h1 data-hero-title>` gets SplitText during `onEnter`:
+- **Sync hero** (in DOM at transition time): SplitText at `delay: 0.65` so chars enter
+  mid clip-reveal.
+- **Async hero** (Sanity/CMS rendered after fetch): a `MutationObserver` sets `opacity: 0`
+  the instant the hero lands (same JS task → no flash), then SplitText; 600ms timeout
+  fallback; `delay` drops to `0.5`.
 
-- **Sync hero** (most pages): `data-hero-title` is already in the DOM at transition time. SplitText fires with `delay: 0.65` so the chars enter while the clip-path reveal is mid-way.
-- **Async hero** (Sanity CMS pages where `<SectionHero>` renders only after fetch): `MutationObserver` watches the page root, sets `opacity: 0` on the hero the instant it lands (same JS task → no flash), then runs SplitText. Falls back after 600ms if the hero never appears. Delay drops to `0.5`.
+`await document.fonts.ready` runs before SplitText (stable metrics). `ScrollTrigger.refresh()`
+fires at the end of the reveal to recompute scroll triggers against live layout.
 
-`await document.fonts.ready` runs before SplitText so font metrics are stable. `ScrollTrigger.refresh()` fires at the end of the clip reveal to recompute any scroll-triggered animations against the live layout.
-
-## WebGL hooks
+## WebGL hook (current)
 
 ```js
-// onLeave (start)
-emitter.emit('transition:start', { direction: 'leave' })
-usePageTransition().prepareTransition()
-// → uTransition 0 → 1 on placeholder (and any DOMPlane meshes)
-
-// onEnter (after clip-path reveal + SplitText setup)
-usePageTransition().enterTransition(delay)
-// → uTransition 1 → 0; per-page DOMPlane uniforms (uReveal, uOpacity) animate if present
+// onEnter — el is the new page's mounted DOM.
+const { $webgl } = useNuxtApp()
+$webgl?.onChange?.(useRoute().name, el)
 ```
 
-By default the **only** mesh receiving these hooks is the placeholder created in the plugin. Pages that call `useDOMPlane()` register their meshes too, and they animate alongside the placeholder.
+That's it — the view swap is a registry lookup + `Page` lifecycle (`onLeave`/`onEnter`),
+not a uniform animation. On touch / reduced-motion / below the breakpoint, `$webgl` is the
+disabled stub (or paused), so `onChange` is a safe no-op and the DOM choreography runs
+unchanged — no `if (webgl)` branches needed.
 
-## Layer-off / mobile path
+## Cross-page WebGL plane flight (available — DORMANT)
 
-When `isMobile()` returns true OR `extends: ['layers/webgl']` is removed:
-- `usePageTransition()`'s functions early-return — no error, no fade calls.
-- The DOM-only choreography (clip + SplitText + bg scale + number) runs unchanged.
-- Visual result: identical to the WebGL-on version minus the placeholder pulse.
+Ported and wired, but **inert until a page uses it** — a textured plane flies from a
+thumbnail on page A into the destination slot on page B.
 
-No `if (webgl)` branches needed in `pageTransition.js` — the composables guard themselves.
+- **`canvas/TransitionController.js`** (`$webgl.transition`, instantiated in `Canvas.mount`)
+  listens for `webgl:transition:prepare`. A source page emits it with a plane mesh on link
+  click; the controller clones + stages it and hides the source.
+- **`pageTransition.js` → `runPlaneFlight($webgl, el)`** (called in `onEnter`) is the
+  destination side: if a mesh is staged (`$webgl.transition.staged`) AND `el` has a
+  `[data-gl-target]`, it calls `getFlightContext(rect)` and runs the GSAP flight (mesh
+  transform + `uPageTransition` ripple + `uOpacity` handoff), then `ctx.cleanup()`. No
+  staged mesh / no `[data-gl-target]` ⇒ **no-op**.
+
+What's missing to light it up: a page with **DOMPlanes** (`[data-gl="img"]`) whose link
+click emits `webgl:transition:prepare` with the plane, and a destination with
+`[data-gl-target]`. The plane side is the [dom-plane](../dom-plane/SKILL.md) toolkit (also
+dormant). Until such a page exists, both sit ready and do nothing.
 
 ## 60fps rules
-
-1. **`document.fonts.ready` once per transition** — Cached after first await.
-2. **MutationObserver is bounded** — 600ms timeout prevents leaks if a CMS page never resolves a hero.
-3. **No layout reads during the clip animation** — Read once at the start, cache, mutate via GSAP.
+1. `document.fonts.ready` once per transition (cached after first await).
+2. MutationObserver bounded (600ms timeout) — no leak if a CMS hero never resolves.
+3. No layout reads during the clip animation — read once, cache, mutate via GSAP.
 
 ## Key files
-
-- [app/transitions/pageTransition.js](app/transitions/pageTransition.js) — the choreography
+- [app/transitions/pageTransition.js](app/transitions/pageTransition.js) — choreography + `$webgl.onChange`
 - [app/app.vue](app/app.vue) — `<NuxtPage :transition="pageTransition" />`
+- [layers/webgl/canvas/index.js](layers/webgl/canvas/index.js) — `onChange` view swap
 - [app/composables/useLenis.js](app/composables/useLenis.js) — Lenis singleton + GSAP ticker
 - [app/utils/Emitter.js](app/utils/Emitter.js) — cross-layer signals
-- [layers/webgl/plugins/webgl.client.js](layers/webgl/plugins/webgl.client.js) — placeholder mesh + uTransition uniform
-- [layers/webgl/composables/usePageTransition.js](layers/webgl/composables/usePageTransition.js) — the hooks

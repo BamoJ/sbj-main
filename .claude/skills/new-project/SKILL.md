@@ -21,24 +21,30 @@ The starter ships with the WebGL layer **enabled** by default.
 
 ### Keep WebGL (default — recommended)
 
-Nothing to do. The layer is already wired:
+The layer is a class-based `Canvas`/`Page` engine — see [webgl-canvas](../webgl-canvas/SKILL.md).
+Already wired:
 - [nuxt.config.ts](nuxt.config.ts) has `extends: ['layers/webgl']`
-- [app/app.vue](app/app.vue) renders `<WebGLCanvas />`
-- The placeholder mesh in [layers/webgl/plugins/webgl.client.js](layers/webgl/plugins/webgl.client.js) renders during route transitions automatically
-- Pages have **zero WebGL code by default** — the canvas is alive and reacts to transitions without any opt-in
+- [app/app.vue](app/app.vue) renders `<WebGLCanvas />` + binds `<NuxtPage :transition>`
+- `app/transitions/pageTransition.js` `onEnter` calls `$webgl.onChange(route.name, el)` to swap views
+- It auto-gates: disabled on touch / reduced-motion, and swaps to a static BG below 768px (see [webgl-toggle](../webgl-toggle/SKILL.md))
 
-If a specific page wants image-driven WebGL effects (scroll distortion, RGB shift, motion blur on the hero), opt in via `useDOMPlane` — see [webgl-dom-page](../webgl-dom-page/SKILL.md). That's the exception, not the default.
+The current home view is a temporary particle logo. For a new project, **replace the
+view**: add a `Page` subclass under `layers/webgl/canvas/<Name>/` and register it in
+`canvas/registry.js` (see [webgl-canvas](../webgl-canvas/SKILL.md) → "Add a view"). For a
+DOM-mapped image plane, the *(reference)* [dom-plane](../dom-plane/SKILL.md) shows the
+pattern to port.
 
 ### Remove WebGL
 
-Full procedure documented in [webgl-toggle](../webgl-toggle/SKILL.md). Short version (4 edits, no per-page changes needed because pages are already bare):
+Full procedure in [webgl-toggle](../webgl-toggle/SKILL.md). Short version:
 
 1. Remove `extends: ['layers/webgl']` from [nuxt.config.ts](nuxt.config.ts).
 2. Remove `<WebGLCanvas />` from [app/app.vue](app/app.vue).
-3. Remove the two `usePageTransition()` calls in [app/transitions/pageTransition.js](app/transitions/pageTransition.js) (one in `onLeave`, one in `onEnter`).
-4. Optionally `rm -rf layers/webgl` + `bun install` to drop `three` from `node_modules`.
+3. Remove the `$webgl.onChange(...)` lines from `onEnter` in [app/transitions/pageTransition.js](app/transitions/pageTransition.js) (keep the `emitter.emit` signals).
+4. In [app/pages/index.vue](app/pages/index.vue), drop `useWebGL()` and hard-show the static BG (`useWebGL` disappears with the layer).
+5. Optionally `rm -rf layers/webgl` + `bun install` to drop `three`.
 
-Result: pure GSAP / Lenis / Sanity Nuxt starter. Transitions still work — they just don't have the WebGL pulse.
+Result: pure GSAP / Lenis / Sanity Nuxt starter; the static `texture.png` becomes the hero.
 
 ## Step 2 — Configure Sanity (per client)
 
@@ -138,9 +144,13 @@ useAnims()
 </template>
 ```
 
-New pages have **zero WebGL code by default.** The WebGL canvas runs in the background via `<WebGLCanvas />` in app.vue and the placeholder mesh in the plugin — pages don't have to opt in for transitions to feel WebGL-driven.
+New pages need **no WebGL code** to render normally. A page only gets a WebGL view if its
+route name is registered in `layers/webgl/canvas/registry.js`; the transition's
+`$webgl.onChange(route.name)` then swaps to it.
 
-If a specific page genuinely needs image-driven WebGL (shader effects on the hero, etc.), opt in via `useDOMPlane` — see the [webgl-dom-page](../webgl-dom-page/SKILL.md) skill. That's the exception, not the default.
+If a page needs its own WebGL, add a `Page` subclass + a registry entry — see
+[webgl-canvas](../webgl-canvas/SKILL.md) → "Add a view". For a DOM-mapped image plane, the
+*(reference)* [dom-plane](../dom-plane/SKILL.md) shows the pattern to port.
 
 Add the route to [MainNav.vue:4-10](app/components/Global/nav/MainNav.vue)'s hardcoded items, or migrate the nav to CMS-driven via the Sanity `settings` singleton.
 
@@ -203,7 +213,7 @@ bunx vercel
 ## Skills you'll want to read next
 
 - [transition](../transition/SKILL.md) — to customise the page transition feel
-- [webgl-dom-page](../webgl-dom-page/SKILL.md) — to add WebGL meshes to a new page
+- [webgl-canvas](../webgl-canvas/SKILL.md) — the WebGL architecture + how to add a view
 - [component](../component/SKILL.md) — to build new Vue components
 - [sanity](../sanity/SKILL.md) — to extend the CMS schema or queries
 

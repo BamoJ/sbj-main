@@ -1,144 +1,101 @@
 ---
 name: canvas-nav
-description: How the WebGL canvas survives Nuxt route changes and what gets added/removed from the scene around `<NuxtPage>` swaps. Use when meshes disappear unexpectedly, the canvas vanishes after nav, or transitions leave broken state.
+description: How the WebGL canvas survives Nuxt route changes and how views are swapped via the registry + Canvas.onChange. Use when the canvas vanishes after nav, a view doesn't swap, or nothing renders after a route change.
 user-invokable: true
 ---
 
-# Canvas navigation — Nuxt router + persistent canvas
+# Canvas navigation — persistent canvas + view swapping
+
+Read [webgl-canvas](../webgl-canvas/SKILL.md) first for the architecture. This skill is
+the nav-specific detail: how the canvas persists and how views swap around `<NuxtPage>`.
 
 ## The pillar
 
-The canvas is a singleton mounted once in [app/app.vue](app/app.vue) (via `<WebGLCanvas />`); the persistent placeholder mesh lives in the scene for the app's lifetime. Pages don't have to do anything to get WebGL during transitions — that's automatic.
+The canvas is mounted **once** in [app/app.vue](app/app.vue) via `<WebGLCanvas />`,
+**outside** `<NuxtPage>`. So the renderer, scene, camera, `Time`, and the `gsap.ticker`
+callback live for the whole app — they survive every route change. Pages don't recreate
+the engine; they just trigger a **view swap**.
 
-When a page genuinely needs an image-driven WebGL plane (opt-in via [useDOMPlane](../dom-plane/SKILL.md)), the composable adds the plane to the scene on mount and removes it on unmount. Those extra meshes join the placeholder in the transition registry temporarily.
+## What swaps a view: `Canvas.onChange(name, data)`
 
-## Lifecycle around a route change
+`onChange` is called in two places:
+- **Initial load** — `WebGLCanvas.vue` calls `$webgl.onChange(route.name)` the first
+  time it builds (there's no page transition on first paint).
+- **Navigation** — `app/transitions/pageTransition.js` `onEnter(el)` calls
+  `$webgl.onChange(useRoute().name, el)` (the new page's DOM is available there).
 
 ```
-User clicks <NuxtLink to="/work">
-  ↓
-Vue Router resolves, pageTransition.onLeave fires
-  ↓
-  emitter.emit('transition:start')
-  usePageTransition().prepareTransition()
-    → animates uTransition on every mesh in the registry
-    → at minimum the placeholder; plus any per-page DOMPlane meshes
-  ↓
-<NuxtPage> swaps the page component
-  ↓
-  OLD page (e.g. index.vue):
-    onUnmounted runs
-    → IF the page called useDOMPlane: composable disposes mesh,
-      unregisters from transition registry
-    → IF the page called useWebGLPage: composable removes the page
-      handle from the canvas RAF set
-    → The placeholder stays — it's owned by the plugin, not by any page
-  ↓
-  NEW page (e.g. work.vue):
-    <script setup> runs
-    → IF the page calls useWebGLPage: registers a handle
-    → IF the page calls useDOMPlane: schedules texture load +
-      mesh creation in onMounted
-  ↓
-pageTransition.onEnter fires (clip-path reveal + SplitText)
-  ↓
-  await document.fonts.ready
-  await MutationObserver settle (for async heroes)
-  usePageTransition().enterTransition(delay)
-    → uTransition 1→0 on every registered mesh
-  ↓
-ScrollTrigger.refresh()
-emitter.emit('transition:complete')
+route is "work"  ──►  $webgl.onChange("work", el)
+   registry["work"]  →  lazily `new Work({scene,camera,renderer,time})`  (cached in pages{})
+   first visit only:  await view.load()  →  view.create()   (adds view.elements to scene)
+   prev.onLeave()     →  hides the old view (elements.visible=false, isActive=false)
+   currentPage = next →  next.onEnter(el)  (visible=true, isActive=true, attach listeners)
 ```
 
 ## Key invariants
 
-- **One persistent canvas.** [layers/webgl/components/WebGLCanvas.vue](layers/webgl/components/WebGLCanvas.vue) mounts ONCE in `app.vue` (outside `<NuxtPage>`). It survives every route swap. The renderer, scene, camera, and `gsap.ticker` callback all live for the app's lifetime.
-- **One persistent placeholder mesh.** Created in [layers/webgl/plugins/webgl.client.js](layers/webgl/plugins/webgl.client.js) inside `mount()`. Lives in `scene.children[0]` for the app's lifetime. The transition system always has at least this one mesh to animate.
-- **Per-page meshes are optional and transient.** Only present when a page opts in via `useDOMPlane`. Added on mount, removed on unmount.
+- **One persistent canvas.** [WebGLCanvas.vue](layers/webgl/components/WebGLCanvas.vue)
+  mounts once in `app.vue`, outside `<NuxtPage>`. Renderer/scene/camera/`Time`/ticker
+  live for the app's lifetime.
+- **Views are cached, not destroyed on leave.** A visited view stays in `Canvas.pages[name]`
+  with its `elements` Group still in the scene but **hidden** (`onLeave` sets
+  `visible=false`, `isActive=false`). Re-entering the route reuses it. Full disposal only
+  happens in `Canvas.unmount()`.
+- **Only `currentPage` runs.** `Canvas.update()` calls `currentPage.update(time)` only,
+  and only the current view is visible — inactive views are inert hidden Groups.
+- **No placeholder mesh.** (The old composable system had one; gone.) An empty scene is
+  valid — it just renders nothing.
 
-## Mesh count expectations
+## Render pause (the responsive switch)
 
-| Scenario                                                 | `scene.children.length`                          |
-| -------------------------------------------------------- | ------------------------------------------------ |
-| Default state, any page                                  | 1 (placeholder only)                             |
-| A page calls `useDOMPlane` once                          | 2 (placeholder + plane)                          |
-| A page calls `useDOMPlane` three times                   | 4                                                |
-| Mid-transition (overlap window) between two opt-in pages | briefly N + M + 1 — both pages' meshes are alive |
-| Mobile / layer disabled                                  | 0 (plugin early-returned, no scene)              |
-
-## Detecting the current page
-
-You usually don't have to. If you do:
-
-```js
-// Inside any Vue component
-const route = useRoute()
-console.log(route.name, route.path, route.params)
-```
-
-```js
-// Inside the layer (no Vue context)
-emitter.on('page:webgl:ready', ({ name }) => { ... })
-// emitted by useWebGLPage when a page registers
-```
-
-There is no central "active page" registry. The transition mesh registry (in [usePageTransition](../webgl-page/SKILL.md)) is flat — all currently-alive meshes get animated. During the overlap window (Nuxt's `mode: 'default'`) both old and new pages' meshes are briefly registered together — intentional.
-
-## When a page mesh appears after nav but before transition finishes
-
-The new page's `<script setup>` runs synchronously during the `<NuxtPage>` swap. `useDOMPlane()` schedules an async texture load. By the time the texture resolves (~50-150ms), the clip-path reveal is in progress. `enterTransition()` fires at `delay: 0.5-0.65s` — usually AFTER the texture is loaded.
-
-If the texture is slow (large image, slow connection), the mesh appears partway through the reveal. Looks fine because `uOpacity` / `uEntrance` are interpolating anyway.
+Below the 768px breakpoint (or touch / reduced-motion), `WebGLCanvas` calls
+`setRenderActive(false)` and `v-show`-hides the canvas. `Canvas.update()` then
+early-returns (no sim, no render) — the loop idles. State is preserved; crossing back
+above 768px resumes instantly. See [webgl-toggle](../webgl-toggle/SKILL.md).
 
 ## Common gotchas
 
-### Mesh from old page lingers after nav
+### Canvas DOM element disappears after nav
+`<WebGLCanvas />` must be at the `app.vue` level, **outside** `<NuxtPage>` (and outside any
+transition wrapper). If it's inside a swapped subtree it remounts on every nav and the GL
+context is lost.
 
-Cause: `useDOMPlane`'s `onUnmounted` didn't fire. Shouldn't happen — Vue always calls `onUnmounted` on a page swap. If it does, suspect:
+### View doesn't swap on navigation
+- The route has no `name`, or the name isn't a key in `canvas/registry.js` → `onChange`
+  logs `[Canvas] No page registered for "<name>"` and no-ops. Set
+  `definePageMeta({ name: '<key>' })` and add the view to the registry.
+- `pageTransition.js` `onEnter` isn't calling `$webgl.onChange(route.name, el)` (check it's
+  still there), or `<NuxtPage :transition="pageTransition">` isn't bound in `app.vue`.
 
-- Page component wrapped in `<KeepAlive>` (we don't use one)
-- A teleport that escaped the page lifecycle
+### Nothing renders / canvas is blank
+- Below the breakpoint or on touch / reduced-motion → WebGL is paused/disabled by design
+  (the static BG shows instead). Check `useNuxtApp().$webgl.activeRef?.value` (true =
+  particles) and `$webgl.enabled` (false on touch).
+- `currentPage` is null → `onChange` was never called or the registry lookup failed.
+  `console.log(useNuxtApp().$webgl.currentPage)`.
 
-Debug:
-
+### Inspecting scene state
 ```js
-console.log(useNuxtApp().$webgl.scene.children.length)
-// Expect: 1 (placeholder) + N opt-in DOMPlane meshes of the current page
+const w = useNuxtApp().$webgl
+console.log(w.currentPage, w.scene.children.length, w.renderActive, w.activeRef?.value)
 ```
-
-### Mesh appears but at wrong position
-
-Cause: `getBoundingClientRect()` returned 0×0 because the wrapper div wasn't laid out yet at measure time. `useDOMPlane` awaits `nextTick()` before measuring — if that's not enough, the wrapper may have `display: none` initially. Fix: ensure the wrapper is laid out before the page mounts.
-
-### Transition runs but no mesh fade
-
-Cause: `usePageTransition()` called from a context where `useCanvas().enabled === false` (mobile, layer removed). By design. Verify:
-
-```js
-console.log(useNuxtApp().$webgl.enabled) // expect: true on desktop
-```
-
-### Canvas DOM element disappears
-
-Cause: `<WebGLCanvas />` is inside something that gets unmounted (like a transition wrapper). It MUST be at the `app.vue` level, OUTSIDE `<NuxtPage>`. Otherwise the canvas remounts on every nav and you lose the placeholder + any state.
 
 ## SSR boundary
 
-The starter runs `ssr: false`. The plugin file ends in `.client.js` — Nuxt only loads it in the browser. Three.js never sees `undefined window`. If you ever flip to hybrid SSR per-route, ALL WebGL composables need `<ClientOnly>` wrappers OR call sites need to be SSR-safe (the composables already are — they return `{ enabled: false }` when the plugin is absent on the server).
+`ssr: false` + the plugin is `webgl.client.js` (browser-only), so Three.js never sees an
+undefined `window`. `useWebGL()` returns a disabled stub when the plugin didn't build the
+Canvas (touch / reduced-motion), so call sites never throw.
 
 ## Key files
 
-- [app/app.vue](app/app.vue) — mounts `<WebGLCanvas />` once
-- [layers/webgl/components/WebGLCanvas.vue](layers/webgl/components/WebGLCanvas.vue) — `<canvas>` element + `mount`/`unmount` calls
-- [layers/webgl/plugins/webgl.client.js](layers/webgl/plugins/webgl.client.js) — renderer/scene/camera + RAF + placeholder mesh
-- [layers/webgl/composables/useWebGLPage.js](layers/webgl/composables/useWebGLPage.js) — optional per-page handle registration
-- [layers/webgl/composables/usePageTransition.js](layers/webgl/composables/usePageTransition.js) — mesh registry + transition hooks
-- [layers/webgl/composables/useDOMPlane.js](layers/webgl/composables/useDOMPlane.js) — optional per-page mesh
-- [app/transitions/pageTransition.js](app/transitions/pageTransition.js) — calls into the transition hooks
+- [app/app.vue](app/app.vue) — mounts `<WebGLCanvas />` once, binds `:transition`
+- [layers/webgl/components/WebGLCanvas.vue](layers/webgl/components/WebGLCanvas.vue) — container, lazy build, `v-show`, pause/resume
+- [layers/webgl/canvas/index.js](layers/webgl/canvas/index.js) — `onChange` / `mount` / `update` / `setRenderActive`
+- [layers/webgl/canvas/registry.js](layers/webgl/canvas/registry.js) — route name → view class
+- [layers/webgl/canvas/Page.js](layers/webgl/canvas/Page.js) — view lifecycle (`onEnter`/`onLeave`)
+- [app/transitions/pageTransition.js](app/transitions/pageTransition.js) — `onEnter` → `$webgl.onChange`
 
 ## Cross-references
-
-- [webgl-toggle](../webgl-toggle/SKILL.md) — turn the layer on/off
-- [transition](../transition/SKILL.md) — choreography during nav
-- [dom-plane](../dom-plane/SKILL.md) — opt-in per-page WebGL planes
+- [webgl-canvas](../webgl-canvas/SKILL.md) — the architecture
+- [transition](../transition/SKILL.md) — choreography during nav + planned plane flight
+- [webgl-toggle](../webgl-toggle/SKILL.md) — enable/disable + the responsive switch

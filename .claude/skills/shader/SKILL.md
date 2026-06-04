@@ -1,204 +1,140 @@
 ---
 name: shader
-description: Write and debug GLSL shaders for the WebGL layer. Use when creating new shader effects, modifying the shared vertex/fragment pair, adding uniforms, or writing GLSL includes.
+description: Write and debug GLSL shaders for the WebGL layer. Shaders live per-view (no shared pair); the current home view also runs a GPU ping-pong simulation. Use when creating shader effects, adding uniforms, or debugging GLSL compile/runtime issues.
 user-invokable: true
 ---
 
 # Shader — GLSL in the WebGL layer
 
-## File structure
+Shaders belong to a **view**, not the layer. There's no shared vertex/fragment pair —
+each `Page` view ships its own `.glsl` files beside it. See
+[webgl-canvas](../webgl-canvas/SKILL.md) for the engine.
+
+## File structure (current: the Home view)
 
 ```
-layers/webgl/shaders/
-├── sharedVert.glsl            # Vertex shader used by useDOMPlane meshes
-├── sharedFrag.glsl            # Fragment shader used by useDOMPlane meshes
-└── includes/
-    └── perlinNoise.glsl       # Reference copy (also inlined into sharedVert)
+layers/webgl/canvas/Home/homeshaders/
+├── sim.frag.glsl       # GPU physics — one ping-pong pass per frame (in Simulation.js)
+├── render.vert.glsl    # samples the sim's position texture → clip space
+└── render.frag.glsl    # draws each particle as a soft point (uAlpha for opacity)
 ```
 
-The placeholder mesh in [layers/webgl/plugins/webgl.client.js](layers/webgl/plugins/webgl.client.js) uses two **inline** shader strings (`PLACEHOLDER_VERT` / `PLACEHOLDER_FRAG`) — not the `.glsl` files. The shared files are for `useDOMPlane`.
+A new view puts its shaders under `canvas/<View>/<view>shaders/` (or inline strings for
+something tiny). The old `layers/webgl/shaders/` shared pair and the `@shaders` alias are
+**gone**.
 
 ## Import system
 
-GLSL files are imported via Vite's built-in `?raw` suffix (no plugin):
+GLSL is imported with Vite's built-in `?raw` suffix (no plugin), by **relative path**:
 
 ```js
-import vertexShader from '@shaders/sharedVert.glsl?raw'
-import fragmentShader from '@shaders/sharedFrag.glsl?raw'
+import simFrag    from './homeshaders/sim.frag.glsl?raw'
+import renderVert from './homeshaders/render.vert.glsl?raw'
+import renderFrag from './homeshaders/render.frag.glsl?raw'
 ```
 
-The `@shaders` alias is set in [layers/webgl/nuxt.config.ts](layers/webgl/nuxt.config.ts). It resolves to `layers/webgl/shaders/`.
+### `#include` — NOT supported
+`?raw` returns the file verbatim; `#include "..."` lines reach the GLSL compiler and
+fail. **Inline shared code by hand.** Example: `sim.frag.glsl` inlines a ~20-line 2D
+simplex noise at the top rather than including it.
 
-### `#include` directives — NOT supported
+## The current Home shaders (orientation, not deep internals)
 
-We don't use `vite-plugin-glsl` (1.6 had a double-wrap bug; 1.3 emits output Vite 7 treats as text). `?raw` returns the file as-is. **`#include "..."` lines are passed through to the GLSL compiler verbatim and will fail.**
+The Home view is a temporary GPU particle logo (its tuning lives in the `config` block of
+`canvas/Home/home.js`; the GPU loop is `canvas/Home/Simulation.js`). Two stages:
 
-To share code across shaders, inline it manually. `sharedVert.glsl` inlines the Perlin noise functions at the top of the file. The `includes/perlinNoise.glsl` file is kept as a reference copy you can paste into new shaders.
+- **Simulation** (`sim.frag.glsl`, run by `Simulation.js`): a fullscreen pass over a float
+  texture where each texel = one particle (RGBA = `posX,posY,velX,velY`). It reads the
+  previous state + an origin texture and writes the next — mouse repulsion + curl-noise
+  flow + return-to-origin + a displacement clamp. Ping-ponged between two
+  `WebGLRenderTarget`s. **Needs WebGL2 float render targets** (`EXT_color_buffer_float`;
+  HalfFloat fallback in `Simulation.js`).
+- **Render** (`render.vert.glsl` + `render.frag.glsl`): a `THREE.Points` whose vertex
+  shader samples the sim's position texture (via a per-particle `ref` UV attribute) and
+  projects pixel→clip; the fragment shader draws a soft round point at `uAlpha` opacity.
 
-## Uniform conventions
+Render uniforms: `uPosition` (sim texture), `uColor`, `u_resolution`, `u_scale`,
+`u_pointSize`, `uAlpha`. Don't treat these as a layer-wide convention — they're this
+view's.
 
-Standard uniforms set by `useDOMPlane` ([layers/webgl/composables/useDOMPlane.js](layers/webgl/composables/useDOMPlane.js)):
+## Writing a shader for a new view
 
-| Uniform | Type | Set by | Purpose |
-|---|---|---|---|
-| `uTexture` | sampler2D | TextureCache | Image texture |
-| `uTime` | float | per-frame from plugin clock | Accumulated time |
-| `uStrength` | float | (currently 0; future: scroll velocity) | Vertex Z-distortion |
-| `uScrollProgress` | float | (currently 0; future: scroll progress) | RGB shift driver |
-| `uOpacity` | float | transition hooks | Alpha (0–1) |
-| `uViewportSizes` | vec2 | plugin viewport | For viewport-relative effects |
-| `uCoverScale` | vec2 | DOMPlane (aspect ratio) | object-fit: cover correction |
-| `uMouse` | vec2 | (currently (0.5, 0.5); future: hover) | Bulge centre |
-| `uBulge` | float | (currently 0; future: hover) | Bulge intensity |
-| `uEntrance` | float | transition hooks | Paper-flutter entrance (1→0) |
-| `uPageTransition` | float | transition hooks | Ripple progress (0→1→0) |
-| `uRGBMul` | float | per-page option `rgbShift` | RGB shift multiplier |
-| `uBlurMul` | float | per-page option `blur` | Motion blur multiplier |
-| `uBulgeMul` | float | per-page option `bulge` | Bulge intensity multiplier |
-| `uBulgeStrengthMul` | float | per-page option `bulgeStrength` | Bulge curve shape |
-
-The placeholder mesh exposes its own minimal set:
-
-| Uniform | Type | Purpose |
-|---|---|---|
-| `uTime` | float | Baseline bottom-edge wave |
-| `uTransition` | float | Route-change radial pulse (0→1→0) |
-
-### Adding a custom uniform to a DOMPlane mesh
+In the view's `createMaterials()`:
 
 ```js
-// In a page using useDOMPlane:
-const { mesh } = useDOMPlane(heroEl, src)
+import vert from './<view>shaders/vertex.glsl?raw'
+import frag from './<view>shaders/fragment.glsl?raw'
 
-watchEffect(() => {
-  if (!mesh.value) return
-  mesh.value.material.uniforms.uMyEffect = { value: 0 }
+this.material = new THREE.ShaderMaterial({
+  vertexShader: vert,
+  fragmentShader: frag,
+  transparent: true,
+  uniforms: { uTime: { value: 0 }, /* … */ },
 })
 ```
 
-Then declare in the shader. Since we share `sharedVert.glsl` / `sharedFrag.glsl` across all DOMPlane users, adding a uniform there affects every page — so either:
-- **Per-instance unique uniform name** + harmless default (`uniform float uMyEffect; void main() { ... gl_FragColor.rgb += uMyEffect * something; }`).
-- **Fork the shader** — duplicate the .glsl files to `customVert.glsl` / `customFrag.glsl`, import those in your own composable instead of `useDOMPlane`.
+Drive uniforms in the view's `update(time)` (`time.seconds`, `time.delta`). For a
+GPU-simulation-style effect (particles, flow, fluid), copy the `Simulation.js` ping-pong
+pattern rather than re-deriving it.
 
-## Shared vertex shader walkthrough
-
-[sharedVert.glsl](layers/webgl/shaders/sharedVert.glsl):
-
-1. **Z wave** — `sin(newPosition.y / uViewportSizes.y * PI) * -uStrength` on Z-axis. Wires up when `uStrength` is driven from scroll velocity (not yet wired in root code).
-2. **Entrance flutter** (when `uEntrance > 0`) — paper-from-below: shifts Y, adds Z sine flutter, ripples across the plane surface.
-3. **Page-transition ripple** (when `uPageTransition > 0`) — sin wave along X + Perlin noise on Z, intensity peaks at `sin(progress * PI)`.
-4. Passes `vUv` to fragment.
-
-## Shared fragment shader walkthrough
-
-[sharedFrag.glsl](layers/webgl/shaders/sharedFrag.glsl):
-
-1. **Cover UV correction** — `(vUv - 0.5) * uCoverScale + 0.5`.
-2. **Bulge distortion** — `bulge()` function reads `uMouse`, `uBulge`, `uBulgeMul`, `uBulgeStrengthMul`. Quadratic curve, harmless at 0.
-3. **RGB shift on Y** — channel offsets driven by `uStrength * uScrollProgress * 0.7 * uRGBMul`.
-4. **Motion blur** — 8-sample vertical loop, gated by `blurAmount < 0.001` early-out. Multiplier is `uBlurMul`. Adds `uEntrance * 1.5` during entrance for extra haze.
-5. **Output** — `vec4(finalColor, uOpacity)`.
-
-## Writing a new shader
-
-### Vertex template (raw plane, no `#include` needed)
-
+### Templates
 ```glsl
+// vertex
 precision highp float;
 uniform float uTime;
 varying vec2 vUv;
-
 void main() {
   vUv = uv;
-  vec3 pos = position;
-  // your vertex effects
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }
 ```
-
-### Fragment template
-
 ```glsl
+// fragment
 precision highp float;
 uniform sampler2D uTexture;
 uniform float uOpacity;
-uniform float uTime;
 varying vec2 vUv;
-
 void main() {
-  vec2 uv = vUv;
-  // your UV effects
-  vec4 color = texture2D(uTexture, uv);
-  gl_FragColor = vec4(color.rgb, color.a * uOpacity);
+  gl_FragColor = vec4(texture2D(uTexture, vUv).rgb, uOpacity);
 }
 ```
 
-### Using a custom shader with a raw mesh
-
-Bypass `useDOMPlane` if you don't want DOM-rect mapping:
-
-```js
-import { Mesh, PlaneGeometry, ShaderMaterial } from 'three'
-import vertexShader from './myVert.glsl?raw'
-import fragmentShader from './myFrag.glsl?raw'
-
-const { scene, viewport } = useCanvas()
-const geometry = new PlaneGeometry(viewport.width, viewport.height)
-const material = new ShaderMaterial({
-  vertexShader,
-  fragmentShader,
-  transparent: true,
-  uniforms: {
-    uTime: { value: 0 },
-    uOpacity: { value: 1 },
-  },
-})
-const mesh = new Mesh(geometry, material)
-scene.add(mesh)
-```
-
-### Using a custom shader through `useDOMPlane` (forked DOMPlane)
-
-If you want DOM mapping but distinct shaders, fork the composable rather than mutating the shared one. Copy `useDOMPlane.js` to e.g. `useTrailPlane.js`, swap the shader imports, expose the new uniforms.
-
 ## 60fps rules
-
-1. **Minimise `texture2D()` calls** — each is expensive. The shared frag does up to 11 in the worst case (3 sharp RGB + 8 blur). Don't add more without an early-out gate.
-2. **`precision highp float`** — used in our shaders because the bulge math + scroll wave need it. Downgrading to `mediump` causes visible banding on the entrance wave. Don't change.
-3. **Avoid branching** — `if/else` kills GPU parallelism. Use `step()`, `smoothstep()`, `mix()`. The shared frag has one acceptable exception: the `blurAmount < 0.001` early-out is a hot perf gate.
-4. **Limit per-fragment math** — move what you can to the vertex shader. Varyings interpolate for free.
-5. **UV-only effects** — distortions that only modify UV before a single texture lookup are far cheaper than multi-sample effects.
-6. **Inline includes** — `?raw` doesn't process `#include`. Paste shared code in. Perlin noise is ~80 lines inlined into `sharedVert.glsl` — keep that pattern.
-7. **Cheaper randomness** — if you just need pseudo-noise (not Perlin), use a hash:
+1. Minimise `texture2D()` calls — each is expensive; gate multi-sample loops with an
+   early-out.
+2. `precision highp float` — the sim's pixel-space positions need it; `mediump` bands/
+   quantises. Keep highp.
+3. Avoid `if/else` in hot fragment paths — prefer `step`/`smoothstep`/`mix`. (A coherent
+   uniform branch like `if (uFlowStrength > 0.0)` is fine — all texels take one path.)
+4. Move per-fragment math to the vertex shader where possible; varyings interpolate free.
+5. Inline includes — `?raw` doesn't process `#include`.
+6. Cheap pseudo-noise if you don't need simplex:
    ```glsl
-   float hash(vec2 p) {
-     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-   }
+   float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
    ```
 
 ## Debugging shaders
-
-1. **Compile errors** — Three.js prints the full shader source with line numbers in the console. The first error is usually the real one; later errors cascade.
-2. **Visual debug** — output a value as colour:
-   ```glsl
-   gl_FragColor = vec4(vUv, 0.0, 1.0);              // UV as red-green gradient
-   gl_FragColor = vec4(vec3(uTransition), 1.0);      // transition as grayscale
-   ```
-3. **Uniform not updating** — set `mesh.material.uniforms.uName.value`, not `mesh.material.uniforms.uName`.
-4. **Black screen** — texture didn't load. Check TextureCache, image src, CORS.
-5. **`renderer.properties.get(material).programs[0].diagnostics`** — Three.js stores compile diagnostics there (vertexShader.log, fragmentShader.log). Useful when the console error is truncated.
+1. **Compile errors** — Three prints the full source with line numbers; the first error is
+   usually the real one.
+2. **Visual debug** — output a value as colour: `gl_FragColor = vec4(vUv, 0.0, 1.0);`.
+3. **Uniform not updating** — set `material.uniforms.uName.value`, not `…uName`.
+4. **Black / nothing** — for the Home sim: float render targets unsupported (check the
+   `Simulation.js` HalfFloat fallback warning), or the source logo image is transparent/
+   missing (no particles). For a textured view: texture didn't load (src/CORS).
+5. `renderer.getContext().getExtension('EXT_color_buffer_float')` — null ⇒ float FBOs
+   unavailable (the sim falls back to HalfFloat, with precision loss past ~2048px).
 
 ## Cross-browser
-
-- **Safari / iOS**: WebGL 1 syntax only on older devices. Use `texture2D`, `gl_FragColor`, `attribute`, `varying`. Avoid WebGL2-only `texture()` / `out` variables.
-- **Firefox**: Stricter GLSL validation. Always declare precision. No undeclared variables, even in dead code paths.
-- **Mobile (Adreno, Mali)**: Cap texture samples under 4 per fragment when possible. Avoid `pow()`.
+- The engine runs on **WebGL2** (Three default) and the Home sim requires WebGL2 float
+  textures. Don't assume WebGL1.
+- **Firefox**: strict GLSL validation — always declare precision; no undeclared vars even
+  in dead paths.
+- **Mobile**: the whole layer is disabled on touch anyway (see
+  [webgl-toggle](../webgl-toggle/SKILL.md)), so shaders effectively target desktop GPUs.
 
 ## Key files
-
-- [layers/webgl/shaders/sharedVert.glsl](layers/webgl/shaders/sharedVert.glsl)
-- [layers/webgl/shaders/sharedFrag.glsl](layers/webgl/shaders/sharedFrag.glsl)
-- [layers/webgl/shaders/includes/perlinNoise.glsl](layers/webgl/shaders/includes/perlinNoise.glsl) — reference copy (inlined into sharedVert)
-- [layers/webgl/composables/useDOMPlane.js](layers/webgl/composables/useDOMPlane.js) — where ShaderMaterial is created with the shared shaders
-- [layers/webgl/plugins/webgl.client.js](layers/webgl/plugins/webgl.client.js) — placeholder mesh's inline shaders (`PLACEHOLDER_VERT` / `PLACEHOLDER_FRAG`)
-- [layers/webgl/nuxt.config.ts](layers/webgl/nuxt.config.ts) — `@shaders` alias
+- [layers/webgl/canvas/Home/homeshaders/sim.frag.glsl](layers/webgl/canvas/Home/homeshaders/sim.frag.glsl)
+- [layers/webgl/canvas/Home/homeshaders/render.vert.glsl](layers/webgl/canvas/Home/homeshaders/render.vert.glsl)
+- [layers/webgl/canvas/Home/homeshaders/render.frag.glsl](layers/webgl/canvas/Home/homeshaders/render.frag.glsl)
+- [layers/webgl/canvas/Home/Simulation.js](layers/webgl/canvas/Home/Simulation.js) — the ping-pong GPU loop
+- [layers/webgl/canvas/Home/home.js](layers/webgl/canvas/Home/home.js) — view + `config` knobs

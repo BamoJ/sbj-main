@@ -4,14 +4,14 @@ This repo is **bamoj.com** — Bamo.J®'s portfolio, launching as a **one-page p
 
 ## Stack
 
-Nuxt 4 (**SPA**, `ssr: false`) · Tailwind v4 (`@tailwindcss/vite`) · GSAP + Lenis · optional **WebGL layer** (`layers/webgl`, Three.js) · **Sanity** CMS (`@nuxtjs/sanity` + `studio/`) · Resend (contact) · `@nuxtjs/seo`. Package manager: **bun**.
+Nuxt 4 (**SPA**, `ssr: false`) · Tailwind v4 (`@tailwindcss/vite`) · GSAP + Lenis · **WebGL layer** (`layers/webgl`, Three.js — class-based `Canvas`/`Page` engine) · **Sanity** CMS (`@nuxtjs/sanity` + `studio/`) · Resend (contact) · `@nuxtjs/seo`. Package manager: **bun**.
 
 ## Current state
 
 - **Pages:** only `app/pages/index.vue` (a hero). about/work/contact/cms-demo were deleted. `MainNav` navItems is `[]`; sitemap returns just `/`; `public/llms.txt` is single-page.
-- **WebGL:** the layer is still `extends`-ed in `nuxt.config.ts`, but `<WebGLCanvas/>` is currently **unmounted** from `app/app.vue` while the hero is reworked — intentional, reintegration is planned. See `.claude/skills/webgl-toggle`.
+- **WebGL:** class-based `Canvas`/`Page` engine in `layers/webgl/canvas/` (ported from the lab), mounted via `<WebGLCanvas/>` in `app/app.vue`. Home hero is a **GPU particle logo** (`canvas/Home/`) on desktop ≥768px; on touch / reduced-motion / <768px it swaps — instantly, on resize — to the static `texture.png` background. See `.claude/skills/webgl-canvas` (architecture) + `webgl-toggle`.
 - **Sanity:** wired to real project `7ysaqk08` (dataset `production`, public). Schema rebuilt from scratch — see below.
-- **Hero bg:** `public/images/texture.png` (full-bleed). `bg.svg` also present.
+- **Hero:** desktop = the WebGL particle logo (`public/images/texture-test.png` — a white-on-transparent mark — rasterized into mouse-reactive particles by `canvas/Home/home.js`); the static `public/images/texture.png` is the mobile / no-WebGL fallback. `bg.svg` also present.
 
 ## Sanity (current schema)
 
@@ -41,4 +41,4 @@ cd studio && bun run dev         # studio   → :3333
 
 ## Where to look
 
-`.claude/skills/` documents each subsystem: `sanity`, `seo`, `aeo`, `layout` (Container 12-col grid), `webgl-toggle` + the other `webgl-*`/`shader`/`transition`/`canvas-nav` skills, `component`, `scroll-anim`, `smoothyslider`, `perf-audit`, `debug`. `new-project` captures the clone → trim → wire-Sanity bootstrap path this project followed.
+`.claude/skills/` documents each subsystem: `sanity`, `seo`, `aeo`, `layout` (Container 12-col grid), `component`, `scroll-anim`, `smoothyslider`, `perf-audit`, `debug`, and the WebGL set — **`webgl-canvas`** (the `Canvas`/`Page` architecture + how to add a page view), `canvas-nav`, `transition`, `shader`, `webgl-toggle`. The `dom-plane` / `webgl-dom-page` / `webgl-page` skills are **reference-only** — the DOMPlane image-plane pattern isn't in the current build (kept for a future project). `new-project` captures the clone → trim → wire-Sanity bootstrap path this project followed.
