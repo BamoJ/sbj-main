@@ -1,5 +1,11 @@
 <script setup>
+import gsap from 'gsap'
+import { SplitText } from 'gsap/SplitText'
 import Container from '~/components/Wrapper/Container.vue'
+import { prefersReducedMotion } from '~/utils/media'
+import { easings } from '~/utils/easings'
+
+gsap.registerPlugin(SplitText)
 
 // Route name = registry key in layers/webgl/canvas/registry.js. The WebGL
 // stage swaps to the Home view when this route is entered.
@@ -35,6 +41,110 @@ const { data: projects } =
 // useState key (Nuxt's built-in cross-component reactive state).
 const isOpen = useState('menu:open', () => false)
 
+// Menu reveal — one paused master timeline that play()s on open and
+// reverse()s on close. We don't reuse useAnims()/[data-anim] here: that
+// system fires once on mount and never reverses (wrong for a toggleable
+// panel). We borrow ParaReveal's SplitText conventions but drive playback
+// off the shared isOpen ref.
+const panel = ref(null)
+let menuTl = null
+let splits = []
+
+onMounted(async () => {
+  // Reduced-motion: skip the timeline entirely. The [data-open] CSS rule
+  // then drives an instant (no-transition) open/close, so the menu still
+  // works — just without the animated reveal.
+  if (prefersReducedMotion()) return
+
+  // SplitText measures rendered glyphs — split before fonts load and lines
+  // mis-wrap (same reason useAnims awaits this).
+  await document.fonts.ready
+  if (!panel.value) return
+
+  const lineEls = panel.value.querySelectorAll('[data-menu-line]')
+  const menuDivLine = panel.value.querySelectorAll(
+    '[data-menu-div-line]',
+  )
+  const lines = []
+  lineEls.forEach((el) => {
+    const split = new SplitText(el, {
+      type: 'lines',
+      mask: 'lines',
+      linesClass: 'line',
+      smartWrap: true,
+      reduceWhiteSpace: false,
+    })
+    splits.push(split)
+    lines.push(...split.lines)
+  })
+
+  // The big intro paragraph leads; everything else cascades after it.
+  const heading = splits[0]?.lines ?? []
+  const rest = lines.slice(heading.length)
+
+  menuTl = gsap.timeline({
+    paused: true,
+  })
+  menuTl
+    .set(lines, { yPercent: 100 }, 0)
+    .fromTo(
+      panel.value,
+      { clipPath: 'inset(0% 0% 0% 100%)' },
+      {
+        clipPath: 'inset(0% 0% 0% 0%)',
+        duration: 1.25,
+        ease: easings.transitionEase,
+      },
+      0,
+    )
+    .to(
+      heading,
+      {
+        yPercent: 0,
+        duration: 1,
+        stagger: 0.05,
+        ease: easings.paragraphEase,
+      },
+      '<+0.65',
+    )
+    .from(
+      menuDivLine,
+      {
+        scaleX: 0,
+        duration: 1.2,
+        stagger: 0.05,
+        ease: easings.transitionEase,
+      },
+      '<+0.25',
+    )
+    .to(
+      rest,
+      {
+        yPercent: 0,
+        duration: 0.8,
+        stagger: 0.025,
+        ease: easings.paragraphEase,
+      },
+      '<+0.2',
+    )
+
+  // If the menu was already open before the timeline finished building
+  // (fonts still loading), jump it to the open state.
+  if (isOpen.value) menuTl.progress(1)
+})
+
+watch(isOpen, (open) => {
+  if (!menuTl) return
+  menuTl.timeScale(open ? 1 : 2)
+  open ? menuTl.play() : menuTl.reverse()
+})
+
+onUnmounted(() => {
+  splits.forEach((s) => s.revert())
+  splits = []
+  menuTl?.kill()
+})
+
 // [data-anim] reveals (the hero <h1> is animated by the page transition).
 useAnims()
 </script>
@@ -47,6 +157,7 @@ useAnims()
     >
       <div
         id="site-menu"
+        ref="panel"
         data-menu-panel
         :data-open="isOpen"
         :class="
@@ -114,14 +225,17 @@ useAnims()
                 close
               </button>
               <div class="absolute bottom-0 w-full h-[3px]">
-                <div class="w-full h-full bg-white"></div>
+                <div
+                  data-menu-div-line
+                  class="w-full h-full bg-white"
+                ></div>
               </div>
             </div>
 
             <div
               class="flex flex-col h-full justify-between pt-[2em]"
             >
-              <span class="text-large leading-[1.1]">
+              <span data-menu-line class="text-large leading-[1.1]">
                 Studio•Bämo.J® is an independent creative studio with
                 a primary focus on web experiences, digital design,
                 motion–interaction and development delivering bespoke
@@ -133,6 +247,7 @@ useAnims()
                 >
                   <div class="absolute top-0 w-full h-[1px]">
                     <div
+                      data-menu-div-line
                       class="w-full h-full bg-white opacity-50"
                     ></div>
                   </div>
@@ -140,8 +255,11 @@ useAnims()
                     class="rounded-round bg-amber-50 w-2 h-2 col-start-1"
                   ></div>
                   <div class="col-start-3 flex flex-col gap-1">
-                    <span>Services</span>
-                    <ul class="mt-2 flex flex-col text-small">
+                    <span data-menu-line>Services</span>
+                    <ul
+                      data-menu-line
+                      class="mt-2 flex flex-col text-small"
+                    >
                       <li>Web Design</li>
                       <li>Web Development</li>
                       <li>Design Direction</li>
@@ -151,8 +269,11 @@ useAnims()
                   <div
                     class="col-start-5 col-span-2 flex flex-col gap-1"
                   >
-                    <span>Accolades</span>
-                    <ul class="mt-2 flex flex-col text-small">
+                    <span data-menu-line>Accolades</span>
+                    <ul
+                      data-menu-line
+                      class="mt-2 flex flex-col text-small"
+                    >
                       <li>Awwwards</li>
                       <li>CSSDA</li>
                       <li>Communication Arts</li>
@@ -167,15 +288,20 @@ useAnims()
                 >
                   <div class="absolute top-0 w-full h-[1px]">
                     <div
+                      data-menu-div-line
                       class="w-full h-full bg-white opacity-50"
                     ></div>
                   </div>
                   <div
+                    data-menu-div-line
                     class="rounded-round bg-amber-50 w-2 h-2 col-start-1"
                   ></div>
                   <div class="col-start-3 flex flex-col gap-1">
-                    <span>Social</span>
-                    <ul class="mt-2 flex flex-col text-small">
+                    <span data-menu-line>Social</span>
+                    <ul
+                      data-menu-line
+                      class="mt-2 flex flex-col text-small"
+                    >
                       <li
                         v-for="social in settings?.socials"
                         :key="social.url"
@@ -187,7 +313,10 @@ useAnims()
                     </ul>
                   </div>
                   <div class="col-start-5 col-span-2">
-                    <div class="flex flex-col gap-1 items-start">
+                    <div
+                      data-menu-line
+                      class="flex flex-col gap-1 items-start"
+                    >
                       <span>Project Inquiries</span>
                       <TextLink
                         class="text-small"
@@ -196,7 +325,10 @@ useAnims()
                         Booking
                       </TextLink>
                     </div>
-                    <div class="flex flex-col gap-1 mt-5 items-start">
+                    <div
+                      data-menu-line
+                      class="flex flex-col gap-1 mt-5 items-start"
+                    >
                       <span>Project Inquiries</span>
                       <TextLink
                         class="text-small"
@@ -212,13 +344,16 @@ useAnims()
                 >
                   <div class="absolute top-0 w-full h-[1px]">
                     <div
+                      data-menu-div-line
                       class="w-full h-full bg-white opacity-50"
                     ></div>
                   </div>
-                  <span class="text-small">
+                  <span data-menu-line class="text-small">
                     6.2615° S, 106.8106° E
                   </span>
-                  <span class="text-small">Full Website Soon</span>
+                  <span data-menu-line class="text-small">
+                    Full Website Soon
+                  </span>
                 </div>
               </div>
             </div>
@@ -274,8 +409,15 @@ useAnims()
                     :rel="
                       project.url ? 'noopener noreferrer' : undefined
                     "
-                    class="grid grid-cols-5 w-full items-center gap-gutter pb-[1em] pt-[1em] relative max-md:pb-2 max-md:pt-2 max-md:grid-cols-6"
+                    class="work-row grid grid-cols-5 w-full items-center gap-gutter pb-[1em] pt-[1em] max-md:pb-2 max-md:pt-2 max-md:grid-cols-6"
                   >
+                    <!-- 3D hover block: hinged at the row's bottom edge, rests
+                         edge-on (invisible) and flips flat to face the viewer
+                         on hover. See .work-row rules in <style scoped>. -->
+                    <div
+                      aria-hidden="true"
+                      class="work-row__fill"
+                    ></div>
                     <div
                       class="project col-span-3 flex flex-row gap-[2.75em] items-start max-md:gap-[1em] max-md:col-span-3"
                     >
@@ -383,14 +525,20 @@ useAnims()
 </template>
 
 <style scoped>
-/* SplitText inserts `.line-mask` at runtime — :deep() pierces scope. */
-h1 :deep(.line-mask) {
+/* SplitText inserts `.line-mask` at runtime — :deep() pierces scope.
+   Covers both the hero <h1> and the menu panel's reveal lines so the
+   last glyph isn't clipped during the yPercent reveal. */
+:deep(.line-mask) {
   padding-right: 0.1em;
 }
 
+/* clip-path is GSAP-driven (the master timeline in <script setup> writes an
+   inline clip-path that overrides these rules whenever the timeline exists).
+   These rules are the no-JS / reduced-motion fallback: closed by default,
+   open instantly via [data-open] — no transition, since the timeline is
+   skipped under reduced-motion. */
 [data-menu-panel] {
   clip-path: inset(0% 0% 0% 100%);
-  transition: clip-path 0.9s cubic-bezier(0.77, 0, 0.175, 1);
 }
 
 [data-menu-panel][data-open='true'] {
@@ -399,5 +547,51 @@ h1 :deep(.line-mask) {
 
 [data-load-line] {
   transform-origin: left center;
+}
+
+[data-menu-div-line] {
+  transform-origin: left center;
+}
+
+/* Work-row hover: a white block slides up from the bottom to fill the row.
+   The fill sits at z-index:-1 (behind the text, above the transparent row bg —
+   overflow:hidden clips it while it's parked below). The text uses
+   mix-blend-mode:difference, so white text reads black wherever the white fill
+   is behind it and stays white elsewhere — inverting/reverting automatically
+   as the fill slides, no color toggle. isolation:isolate confines the blend to
+   the row (it won't blend against the page bg behind it). */
+.work-row {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  color: #fff;
+}
+
+.work-row span {
+  mix-blend-mode: difference;
+}
+
+.work-row__fill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: #fff;
+  transform: translateY(105%);
+  pointer-events: none;
+  transition: transform 0.5s var(--gleasing);
+}
+
+.work-row:hover .work-row__fill {
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .work-row,
+  .work-row__fill {
+    transition: none;
+  }
+  .work-row__fill {
+    display: none;
+  }
 }
 </style>

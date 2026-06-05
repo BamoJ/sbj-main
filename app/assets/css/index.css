@@ -10,3 +10,6 @@
 /* Design system — tokens (knobs + @theme formulas) + theme cascade */
 @import './tokens.css';
 @import './theme.css';
+
+/* Component layers — reusable UI elements, built with the design system */
+@import './easings.css';
