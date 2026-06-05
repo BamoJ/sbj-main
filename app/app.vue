@@ -8,8 +8,7 @@ useLenis()
 
 <template>
   <Theme class="u-theme-dark overflow-hidden">
-    <!-- Persistent WebGL stage. Mounts once; the GL context survives route
-         changes. onMounted boots the renderer + enters the initial page. -->
+    <Preloader />
     <WebGLCanvas />
     <MainNav />
     <main>

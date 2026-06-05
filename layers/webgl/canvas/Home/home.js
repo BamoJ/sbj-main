@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import gsap from 'gsap'
 import { Page } from '../Page'
 import { Simulation } from './Simulation'
 import renderVert from './homeshaders/render.vert.glsl?raw'
@@ -24,7 +25,7 @@ export class Home extends Page {
       damping: 0.9, // viscosity (gooey = high)
       flowStrength: 0, // ambient curl-noise drift OFF — interaction is hover-only (0 = off, skips the curl taps via the shader guard)
       flowScale: 0.0022, // eddy size (smaller = bigger, slower swirls)
-      pointSize: 5,
+      pointSize: 6.5,
       fit: 'cover', // 'cover' = fill screen, keep proportions (crop overflow) |
       //               'contain' = whole design visible (letterbox) | 'stretch' = warp to fill
       scale: 1.0, // zoom multiplier on top of the fit (1 = exact fit, >1 zooms in)
@@ -63,7 +64,16 @@ export class Home extends Page {
       'position',
       new THREE.BufferAttribute(new Float32Array(this.count * 3), 3),
     )
-    this.geometry.setAttribute('ref', new THREE.BufferAttribute(this.refs, 2))
+    this.geometry.setAttribute(
+      'ref',
+      new THREE.BufferAttribute(this.refs, 2),
+    )
+    // Per-particle intro scatter offset (px) — the render lerps simPos → simPos+offset
+    // via uProgress. Origins/sim untouched, so the resting logo is byte-identical.
+    this.geometry.setAttribute(
+      'aScatter',
+      new THREE.BufferAttribute(this._buildScatter(), 2),
+    )
     this.geometry.setDrawRange(0, this.count)
   }
 
@@ -101,9 +111,73 @@ export class Home extends Page {
         u_resolution: { value: new THREE.Vector2(width, height) },
         u_scale: { value: new THREE.Vector2(1, 1) }, // fill is baked into origins
         u_pointSize: { value: this.config.pointSize * dpr },
-        uAlpha: { value: this.config.alpha },
+        // Start hidden — the preloader fades this in. uProgress defaults to 1 (logo at
+        // rest, identical to before); the intro drives it 0→1 for the scatter→gather.
+        uAlpha: { value: 0 },
+        uProgress: { value: 1 },
       },
     })
+  }
+
+  // Armed at page-enter (while the preloader still covers the screen): put the render
+  // in its fully-scattered state (uProgress = 0) at alpha 0, so the particles sit
+  // invisibly dispersed the whole time the loader is up — the first visible frame is
+  // scattered, never the assembled logo. The sim is left at rest (origins); the
+  // scatter is purely the render offset, so nothing about the logo is disturbed.
+  _armScatter() {
+    if (!this.material) return
+    this._introLock = true // ignore the mouse until the intro finishes
+    this.animationCount = 0
+    this.mouse.set(-99999, -99999)
+    this.material.uniforms.uAlpha.value = 0 // invisible until released
+    this.material.uniforms.uProgress.value = 0 // fully scattered
+    this._armed = true
+  }
+
+  // Called by the preloader once the overlay has cleared. ONE tween drives the whole
+  // gather: uProgress 0→1 lerps every particle from its scatter offset onto the logo.
+  //   • duration = the ONLY speed knob
+  //   • ease     = the ONLY easing knob (a true curve → smooth by definition)
+  // At uProgress = 1 the render is exactly the sim position, so the mouse physics
+  // resume untouched. Origins are never animated → proportion is exact.
+  playIntro() {
+    if (!this.material) return
+    if (!this._armed) this._armScatter() // safety — guarantee a scattered start
+    const u = this.material.uniforms
+
+    const tl = gsap.timeline({
+      onComplete: () => {
+        this._introLock = false // hand the mouse back exactly when the gather ends
+        this._armed = false
+      },
+    })
+    tl.to(
+      u.uAlpha,
+      { value: this.config.alpha, duration: 0.6, ease: 'power1.out' },
+      0,
+    )
+    tl.to(
+      u.uProgress,
+      { value: 1, duration: 2.0, ease: 'power3.out' },
+      0,
+    ) // ← speed + easing
+    return tl
+  }
+
+  _buildScatter() {
+    const MIN_FRAC = 0.3
+    const MAX_FRAC = 0.7
+    const { width, height } = this._getResolution()
+    const base = Math.min(width, height)
+    const arr = new Float32Array(this.count * 2)
+    for (let i = 0; i < this.count; i++) {
+      const ang = Math.random() * Math.PI * 2
+      const mag =
+        base * (MIN_FRAC + Math.random() * (MAX_FRAC - MIN_FRAC))
+      arr[i * 2 + 0] = Math.cos(ang) * mag
+      arr[i * 2 + 1] = Math.sin(ang) * mag
+    }
+    return arr
   }
 
   createMeshes() {
@@ -115,18 +189,26 @@ export class Home extends Page {
   onEnter() {
     super.onEnter()
 
+    // Arm the scatter NOW (preloader still covers the screen) so the particles sit
+    // invisibly dispersed — the first visible frame is scattered, never the logo.
+    this._armScatter()
+
     this._onMouseMove = (e) => {
+      if (this._introLock) return // intro gather owns the particles — ignore the mouse
       const rect = this.renderer.domElement.getBoundingClientRect()
-      const dpr = window.devicePixelRatio || 1
+      const dpr = window.devicePixelRatio || 2
       this.mouse.x = (e.clientX - rect.left) * dpr
       this.mouse.y = (e.clientY - rect.top) * dpr
       this.animationCount = 300 // keep pushing for ~300 frames after the move
     }
-    window.addEventListener('mousemove', this._onMouseMove, { passive: true })
+    window.addEventListener('mousemove', this._onMouseMove, {
+      passive: true,
+    })
   }
 
   onLeave() {
-    if (this._onMouseMove) window.removeEventListener('mousemove', this._onMouseMove)
+    if (this._onMouseMove)
+      window.removeEventListener('mousemove', this._onMouseMove)
     super.onLeave()
   }
 
@@ -149,10 +231,19 @@ export class Home extends Page {
     // Re-center origins (logo stays centered) and snap particles to them.
     this._recomputeOrigins(width, height)
     this.simulation.reseed(this.originData, this.seedData)
+
+    // Re-roll the scatter offsets for the new canvas size (keeps the intro sized
+    // correctly if a resize lands before/while it plays). Harmless after the intro.
+    const scatter = this.geometry?.getAttribute('aScatter')
+    if (scatter) {
+      scatter.array.set(this._buildScatter())
+      scatter.needsUpdate = true
+    }
   }
 
   destroy() {
-    if (this._onMouseMove) window.removeEventListener('mousemove', this._onMouseMove)
+    if (this._onMouseMove)
+      window.removeEventListener('mousemove', this._onMouseMove)
     this.simulation?.dispose()
     this.colorTexture?.dispose()
     super.destroy()
@@ -189,7 +280,9 @@ export class Home extends Page {
     this.logoH = logoH
 
     const tempCanvas = document.createElement('canvas')
-    const ctx = tempCanvas.getContext('2d', { willReadFrequently: true })
+    const ctx = tempCanvas.getContext('2d', {
+      willReadFrequently: true,
+    })
     tempCanvas.width = logoW
     tempCanvas.height = logoH
     ctx.clearRect(0, 0, logoW, logoH)
@@ -219,7 +312,10 @@ export class Home extends Page {
     this.simSize = Math.max(1, Math.ceil(Math.sqrt(this.count)))
     const texels = this.simSize * this.simSize
 
-    this.relativePositions = pixels.map((p) => ({ x: p.relX, y: p.relY }))
+    this.relativePositions = pixels.map((p) => ({
+      x: p.relX,
+      y: p.relY,
+    }))
     this._pixels = pixels
 
     this.originData = new Float32Array(texels * 4)
@@ -259,7 +355,10 @@ export class Home extends Page {
     } else {
       // Uniform scale keeps the design's true proportions. cover = max (fills
       // screen, crops overflow); contain = min (whole design, letterboxed).
-      const s = this.config.fit === 'contain' ? Math.min(fx, fy) : Math.max(fx, fy)
+      const s =
+        this.config.fit === 'contain'
+          ? Math.min(fx, fy)
+          : Math.max(fx, fy)
       sx = s
       sy = s
     }
@@ -298,7 +397,11 @@ export class Home extends Page {
   _hexToRgb(hex) {
     const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
     return m
-      ? { r: parseInt(m[1], 16) / 255, g: parseInt(m[2], 16) / 255, b: parseInt(m[3], 16) / 255 }
+      ? {
+          r: parseInt(m[1], 16) / 255,
+          g: parseInt(m[2], 16) / 255,
+          b: parseInt(m[3], 16) / 255,
+        }
       : { r: 1, g: 1, b: 1 }
   }
 }

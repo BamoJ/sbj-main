@@ -1,4 +1,5 @@
 <script setup>
+import { emitter } from '~/utils/Emitter'
 // The persistent stage container. Lives once in app.vue so the GL context
 // survives <NuxtPage> route changes.
 //
@@ -13,12 +14,15 @@ const webgl = useWebGL()
 const active = computed(() => webgl?.activeRef?.value ?? false)
 
 let built = false
-function syncActive(on) {
+async function syncActive(on) {
   if (!webgl?.enabled || !container.value) return
   if (on && !built) {
-    webgl.mount(container.value)
-    webgl.onChange(route.name)
     built = true
+    webgl.mount(container.value)
+    // onChange resolves after the view's load() (rasterize PNG) + sim build —
+    // i.e. the particles are ready. The preloader's tracker waits on this.
+    await webgl.onChange(route.name)
+    emitter.emit('webgl:ready')
   }
   webgl.setRenderActive?.(on)
 }

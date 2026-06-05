@@ -6,6 +6,13 @@ body {
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* old Edge / IE */
   font-family: var(--font-primary);
+  /* Paint the dark surface from the very first frame. The themed `.u-theme-*`
+     wrappers live INSIDE the Vue app, so before hydration the body would fall
+     back to the browser default (white) — a white flash on a dark SPA. Match
+     `.u-theme-dark`'s --color-bg so first paint == final surface; color-scheme
+     keeps form controls / scrollbars dark too. */
+  background-color: #131313;
+  color-scheme: dark;
 }
 
 html::-webkit-scrollbar,

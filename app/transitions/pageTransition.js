@@ -6,6 +6,12 @@ import { emitter } from '~/utils/Emitter'
 
 gsap.registerPlugin(SplitText, ScrollTrigger)
 
+// First mount is owned by the preloader (Preloader.vue): it covers the page and
+// runs its own staggered reveal of [data-load] + the WebGL scatter→gather. So we
+// skip the clip/hero choreography on the initial load and only run it on real
+// page-to-page navigation. One-page site today ⇒ this just disables it on boot.
+let isFirstLoad = true
+
 export const pageTransition = {
   // Nuxt merges this object with its default `{ name: 'page', mode: 'out-in' }`
   // via `defu` — and defu treats undefined as "not set", so just omitting
@@ -36,6 +42,7 @@ export const pageTransition = {
   // frame where the new element paints fully visible before our styles
   // apply — that's the "starts blank then pops" jank.
   onBeforeEnter(el) {
+    if (isFirstLoad) return // preloader owns the first reveal — don't pin/clip
     gsap.set(el, {
       position: 'fixed',
       top: 0,
@@ -48,6 +55,17 @@ export const pageTransition = {
   },
 
   async onEnter(el, done) {
+    if (isFirstLoad) {
+      isFirstLoad = false
+      // WebGLCanvas.vue already drives the initial view swap + emits webgl:ready,
+      // and the preloader runs the reveal. Just settle this page into flow.
+      window.scrollTo(0, 0)
+      ScrollTrigger.refresh()
+      emitter.emit('transition:complete')
+      done()
+      return
+    }
+
     // Swap the WebGL view to match the incoming route. `el` is the new page's
     // mounted DOM, so DOM-driven views can read it. No-op on mobile/layer-off.
     const { $webgl } = useNuxtApp()
