@@ -8,10 +8,12 @@
 // are imported by relative path, so no alias is needed.
 export default defineNuxtConfig({
   vite: {
-    // Pre-bundle three + gsap so cold-start `bun dev` doesn't trigger a
-    // re-optimize on first page hit (Vite warns about this otherwise).
+    // Pre-bundle gsap (it's in the boot path) so cold-start `bun dev` doesn't
+    // re-optimize on first page hit. `three` is deliberately NOT here: it's
+    // dynamically imported (see plugins/webgl.client.js → ensure()) so it splits
+    // into its own chunk and stays out of the entry bundle.
     optimizeDeps: {
-      include: ['three', 'gsap'],
+      include: ['gsap'],
     },
   },
 })

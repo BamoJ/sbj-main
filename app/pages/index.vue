@@ -26,16 +26,28 @@ useSanitySeo('home', {
 })
 
 // Site settings singleton — social links for the footer cell.
-const { data: settings } =
-  await useSanityQuery(groq`*[_type == "settings"][0]{
+// LAZY (no `await`): a blocking await here sits in Nuxt's root Suspense boundary
+// and holds the ENTIRE app — including the <Preloader> overlay in app.vue — out
+// of the DOM until Sanity answers. Lazy lets the app mount the instant JS boots;
+// the data streams in after (template already guards with `?.` / empty v-for).
+const { data: settings, status: settingsStatus } = useLazySanityQuery(groq`*[_type == "settings"][0]{
   socials[]{ label, url }
 }`)
 
 // Work index — all projects in Studio order (drag-to-reorder via orderRank).
-const { data: projects } =
-  await useSanityQuery(groq`*[_type == "project"] | order(orderRank){
+const { data: projects, status: projectsStatus } = useLazySanityQuery(groq`*[_type == "project"] | order(orderRank){
   _id, title, role, year, url
 }`)
+
+// Tell the Preloader's tracker when the CMS has actually landed. The queries are
+// lazy (don't block mount), so the loader must explicitly wait on them — this is
+// the `cms` milestone it gates the reveal on. Settled = success OR error (a
+// failed/CORS-blocked fetch must not trap the loader; the 8s failsafe also covers it).
+const cmsReady = useState('cms:ready', () => false)
+const isSettled = (s) => s === 'success' || s === 'error'
+watchEffect(() => {
+  if (isSettled(settingsStatus.value) && isSettled(projectsStatus.value)) cmsReady.value = true
+})
 
 // Menu panel open state — shared with the MainNav button via the same
 // useState key (Nuxt's built-in cross-component reactive state).

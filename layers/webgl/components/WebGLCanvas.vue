@@ -18,6 +18,9 @@ async function syncActive(on) {
   if (!webgl?.enabled || !container.value) return
   if (on && !built) {
     built = true
+    // Lazily import three + build the Canvas here (first desktop activation) —
+    // this is the seam that keeps three.js out of the boot bundle.
+    await webgl.ensure?.()
     webgl.mount(container.value)
     // onChange resolves after the view's load() (rasterize PNG) + sim build —
     // i.e. the particles are ready. The preloader's tracker waits on this.

@@ -1,17 +1,16 @@
 import { gsap } from 'gsap'
 import { isTouch, prefersReducedMotion } from '~/utils/media'
-import Canvas from '../canvas'
-import { registry } from '../canvas/registry'
 
-// Boots the WebGL stage and exposes it as `$webgl` (the Canvas instance).
-// The renderer is NOT created here — WebGLCanvas.vue calls `$webgl.mount(el)`
-// when the viewport first crosses the breakpoint.
+// Boots the WebGL stage and exposes it as `$webgl`. Three.js is NOT in the boot
+// bundle: the Canvas (and three) are dynamically imported the first time the
+// canvas actually activates (desktop ≥768px) via `ensure()`. So mobile/touch and
+// the initial paint never download/parse three.js — it lands in its own chunk.
 //
-// Two-level gating:
-//   • Capability (touch / reduced-motion): disabled stub, no Three.js built — the
-//     static home BG shows. Fixed per device.
-//   • `activeRef` (viewport ≥ 768px): a reactive ref that toggles particles ↔ BG
-//     live on resize. Components read it; WebGLCanvas pauses/shows accordingly.
+// Two-level gating (unchanged behaviour, just deferred loading):
+//   • Capability (touch / reduced-motion): disabled stub, three.js never loaded.
+//   • `activeRef` (viewport ≥ 768px): reactive ref toggling particles ↔ BG live.
+//     Kept SYNCHRONOUS here so consumers (index.vue showLogoFallback, Preloader)
+//     read it at boot without waiting on the deferred Canvas.
 const BREAKPOINT = '(min-width: 768px)'
 
 export default defineNuxtPlugin({
@@ -22,6 +21,7 @@ export default defineNuxtPlugin({
       nuxtApp.provide('webgl', {
         enabled: false,
         activeRef: ref(false),
+        ensure() {},
         mount() {},
         unmount() {},
         onChange() {},
@@ -30,28 +30,64 @@ export default defineNuxtPlugin({
       return
     }
 
-    const canvas = new Canvas(registry)
-
-    // Reactive viewport gate — flips on every breakpoint crossing.
+    // Reactive viewport gate — synchronous, flips on every breakpoint crossing.
     const mq = window.matchMedia(BREAKPOINT)
     const activeRef = ref(mq.matches)
     const onMq = (e) => { activeRef.value = e.matches }
     mq.addEventListener('change', onMq)
-    canvas.activeRef = activeRef
 
-    // Single loop: gsap.ticker drives Time, Time triggers Canvas.update().
-    // Shared with Lenis + ScrollTrigger so every system advances in one frame.
-    const tick = () => canvas.time.tick()
-    gsap.ticker.add(tick)
+    let canvas = null
+    let loadPromise = null
+    let tick = null
+
+    // The stable object every consumer captures. Methods delegate to the real
+    // Canvas once `ensure()` has loaded it; they're safe no-ops before that.
+    const controller = {
+      enabled: true,
+      activeRef,
+      get currentPage() { return canvas?.currentPage ?? null },
+      get transition() { return canvas?.transition ?? null },
+      get renderer() { return canvas?.renderer ?? null },
+
+      // Dynamically import three + Canvas ONCE, wire it into the shared ticker.
+      // Idempotent: concurrent/repeat calls share the one in-flight promise.
+      ensure() {
+        if (canvas) return Promise.resolve(canvas)
+        if (!loadPromise) {
+          loadPromise = (async () => {
+            const [{ default: Canvas }, { registry }] = await Promise.all([
+              import('../canvas'),
+              import('../canvas/registry'),
+            ])
+            canvas = new Canvas(registry)
+            canvas.activeRef = activeRef
+            tick = () => canvas.time.tick()
+            gsap.ticker.add(tick)
+            return canvas
+          })()
+        }
+        return loadPromise
+      },
+
+      mount(el) { return canvas?.mount(el) },
+      onChange(name, data) { return canvas?.onChange(name, data) },
+      setRenderActive(v) { canvas?.setRenderActive(v) },
+      unmount() {
+        if (tick) gsap.ticker.remove(tick)
+        canvas?.unmount()
+        canvas = null
+        loadPromise = null
+      },
+    }
 
     if (import.meta.hot) {
       // Avoid stacking tickers / listeners across HMR reloads of this plugin.
       import.meta.hot.dispose(() => {
-        gsap.ticker.remove(tick)
+        if (tick) gsap.ticker.remove(tick)
         mq.removeEventListener('change', onMq)
       })
     }
 
-    nuxtApp.provide('webgl', canvas)
+    nuxtApp.provide('webgl', controller)
   },
 })

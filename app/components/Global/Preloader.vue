@@ -45,74 +45,110 @@ onMounted(async () => {
 })
 
 // ── the "everything" tracker ───────────────────────────────────────────────
-// Real load progress across fonts, images, the WebGL view and JS/CSS bundles +
-// XHR/fetch (via the resource timeline). Completion hinges on the explicit
-// milestones; the resource feed only smooths the bar. A hard timeout is the
-// failsafe so the overlay can never be trapped.
+// Drives the loader number from REAL load signals, normalized + monotonic:
+//   • Resource-timing backbone: EVERY script / css / font / img / fetch / xhr
+//     (past via buffered:true + future), summed by transferSize → a byte-weighted
+//     fill that climbs faster on fast connections, slower on slow ones.
+//   • Weighted milestones for work bytes can't represent: fonts, WebGL (texture
+//     rasterize + first GPU frame), CMS (the lazy Sanity queries settling).
+//   • Finish = every milestone done AND the network idle ~500ms (catches the
+//     late/lazy tail — images added after CMS, deferred chunks, CDN images).
+//   • 8s hard failsafe so the overlay can never be trapped.
+// Honest limits (see .claude/skills/preloader): the loader's own JS/CSS load
+// before it can render — counted retroactively (buffered) but the bar visibly
+// starts at JS-ready; and total bytes are unknown upfront, so the number is a
+// real-signal-driven normalized estimate that hits 100 exactly at true finish.
 function trackEverything(gl) {
   const progress = ref(0)
   let resolve
   const ready = new Promise((r) => (resolve = r))
 
-  // WebGL gate is pre-satisfied when the layer is off (touch / reduced-motion / <768px).
-  const gates = {
+  // Milestones — discrete work the byte feed can't see. webgl/cms are
+  // pre-satisfied when they don't apply (WebGL off on touch / <768px; cms
+  // already settled by the time the loader mounts).
+  const cmsReady = useState('cms:ready', () => false)
+  const milestones = {
     fonts: false,
-    images: false,
-    doc: false,
-    webgl: !gl?.enabled,
+    // Pre-satisfied when WebGL won't activate for THIS load (touch/reduced-motion,
+    // or a narrow <768px window where the static BG shows) — otherwise we'd wait
+    // on a `webgl:ready` that never fires and fall back to the 8s timeout.
+    webgl: !gl?.enabled || !gl?.activeRef?.value,
+    cms: cmsReady.value === true,
   }
-  const total = Object.keys(gates).length
-  const doneCount = () => Object.values(gates).filter(Boolean).length
+  const msTotal = Object.keys(milestones).length
+  const msDone = () => Object.values(milestones).filter(Boolean).length
+
+  // Byte-weighted fill. Resource-timing entries only fire when a resource
+  // COMPLETES, so we sum finished bytes and map them through a saturating curve
+  // normalized by an expected first-load weight → smooth, load-proportional.
+  const SCALE = 600_000 // ≈ expected first-load transfer (tunable)
+  let bytesLoaded = 0
+  let lastResourceAt = performance.now()
 
   let settled = false
-  let finishTimer = null
+  let finishTimer = null // 8s failsafe
+  let idleTimer = null // network-idle watcher
 
   const finish = () => {
     if (settled) return
     settled = true
     po?.disconnect()
     clearTimeout(finishTimer)
+    clearTimeout(idleTimer)
     progress.value = 1
     resolve()
   }
+
+  // Done only when every milestone is satisfied AND the network has gone quiet.
   const maybeFinish = () => {
-    progress.value = Math.max(progress.value, doneCount() / total)
-    if (doneCount() === total) {
-      clearTimeout(finishTimer)
-      finishTimer = setTimeout(finish, 300) // brief settle so the bar reaches 100
-    }
+    clearTimeout(idleTimer)
+    if (msDone() < msTotal) return
+    const wait = Math.max(0, 500 - (performance.now() - lastResourceAt))
+    idleTimer = setTimeout(finish, wait)
   }
-  const markGate = (key) => () => {
-    gates[key] = true
+
+  const compute = () => {
+    if (settled) return
+    const resourcePart = 1 - Math.exp(-bytesLoaded / SCALE) // 0 → ~1 by bytes
+    const msPart = msDone() / msTotal
+    // Blend; held below 1 until the real finish so the number never lies.
+    const target = Math.min(0.99, 0.5 * msPart + 0.5 * resourcePart)
+    progress.value = Math.max(progress.value, target) // monotonic
     maybeFinish()
+  }
+
+  const markMilestone = (key) => () => {
+    milestones[key] = true
+    compute()
   }
 
   let po = null
   try {
     po = new PerformanceObserver((list) => {
-      if (list.getEntries().length && !settled) {
-        progress.value = Math.min(0.95, progress.value + 0.005)
+      for (const e of list.getEntries()) {
+        bytesLoaded += e.transferSize || e.encodedBodySize || 0
       }
+      lastResourceAt = performance.now()
+      compute()
     })
-    po.observe({ type: 'resource', buffered: true })
+    po.observe({ type: 'resource', buffered: true }) // past + future resources
   } catch {
-    /* unsupported — gates + timeout still resolve */
+    /* unsupported — milestones + timeout still resolve */
   }
 
-  document.fonts.ready.then(markGate('fonts'))
+  document.fonts.ready.then(markMilestone('fonts'))
+  if (gl?.enabled) emitter.once('webgl:ready', markMilestone('webgl'))
+  if (!milestones.cms) {
+    const stop = watch(cmsReady, (v) => {
+      if (v) {
+        stop()
+        markMilestone('cms')()
+      }
+    })
+  }
 
-  if (document.readyState === 'complete') gates.doc = true
-  else
-    window.addEventListener('load', markGate('doc'), { once: true })
-
-  if (gl?.enabled) emitter.once('webgl:ready', markGate('webgl'))
-
-  Promise.allSettled(
-    [...document.images].map((i) => i.decode().catch(() => {})),
-  ).then(markGate('images'))
-
-  maybeFinish()
-  setTimeout(finish, 8000) // failsafe
+  compute()
+  finishTimer = setTimeout(finish, 8000) // failsafe
 
   return {
     progress,
@@ -120,6 +156,7 @@ function trackEverything(gl) {
     cleanup: () => {
       po?.disconnect()
       clearTimeout(finishTimer)
+      clearTimeout(idleTimer)
     },
   }
 }
