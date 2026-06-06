@@ -65,6 +65,7 @@ onMounted(async () => {
   const menuDivLine = panel.value.querySelectorAll(
     '[data-menu-div-line]',
   )
+  const menuFadeEls = panel.value.querySelectorAll('[data-menu-fade]')
   const lines = []
   lineEls.forEach((el) => {
     const split = new SplitText(el, {
@@ -117,6 +118,18 @@ onMounted(async () => {
       },
       '<+0.25',
     )
+    .from(
+      menuFadeEls,
+      {
+        opacity: 0,
+        duration: 1,
+        stagger: {
+          amount: 0.2,
+        },
+        ease: 'sine.inOut',
+      },
+      '< ',
+    )
     .to(
       rest,
       {
@@ -135,7 +148,7 @@ onMounted(async () => {
 
 watch(isOpen, (open) => {
   if (!menuTl) return
-  menuTl.timeScale(open ? 1 : 2)
+  menuTl.timeScale(open ? 1 : 3)
   open ? menuTl.play() : menuTl.reverse()
 })
 
@@ -180,7 +193,7 @@ useAnims()
             <div
               class="w-full flex flex-row justify-between relative pb-[1em]"
             >
-              <span class="w-[3rem]">
+              <span data-menu-fade class="w-[3rem]">
                 <svg
                   width="100%"
                   height="100%"
@@ -219,6 +232,7 @@ useAnims()
                 </svg>
               </span>
               <button
+                data-menu-fade
                 class="px-2 py-2 cursor-pointer"
                 @click="isOpen = false"
               >
@@ -252,6 +266,7 @@ useAnims()
                     ></div>
                   </div>
                   <div
+                    data-menu-fade
                     class="rounded-round bg-amber-50 w-2 h-2 col-start-1"
                   ></div>
                   <div class="col-start-3 flex flex-col gap-1">
@@ -293,7 +308,7 @@ useAnims()
                     ></div>
                   </div>
                   <div
-                    data-menu-div-line
+                    data-menu-fade
                     class="rounded-round bg-amber-50 w-2 h-2 col-start-1"
                   ></div>
                   <div class="col-start-3 flex flex-col gap-1">
