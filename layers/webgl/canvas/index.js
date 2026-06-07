@@ -17,6 +17,7 @@ export default class Canvas {
   constructor(registry = {}) {
     this.enabled = true
     this.renderActive = true // paused below the viewport breakpoint (BG shown)
+    this._resumeDraw = false // forces one draw after a pause→resume (avoids blank)
     this.time = new Time()
 
     this.createCamera()
@@ -47,7 +48,10 @@ export default class Canvas {
     if (this.renderer) return
     this.container = container
 
-    this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' })
+    // preserveDrawingBuffer: render-on-demand stops drawing when the logo settles
+    // (see Home.needsRender) — this guarantees the last frame stays on screen while
+    // we're not rendering and across a tab return, so the canvas never goes blank.
+    this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true })
     // Pixel ratio BEFORE size — setSize derives the drawing buffer from the
     // current ratio, so setting it after would leave the buffer wrong.
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -106,16 +110,28 @@ export default class Canvas {
     this.currentPage?.onResize?.()
   }
 
-  // Toggled by WebGLCanvas as the viewport crosses the breakpoint.
+  // Toggled by WebGLCanvas as the viewport crosses the breakpoint / the tab's
+  // visibility changes. On a false→true (resume) transition, force one draw even if
+  // the page is settled — the browser may have dropped the canvas layer while paused,
+  // so a single redraw guarantees we come back to the last frame, never blank.
   setRenderActive(v) {
+    if (v && !this.renderActive) this._resumeDraw = true
     this.renderActive = v
   }
 
   update() {
-    // Paused below the breakpoint: skip sim + render entirely (no GPU cost while
-    // the static BG is showing). State is preserved for an instant resume.
+    // Paused below the breakpoint / while the tab is hidden: skip sim + render
+    // entirely (no GPU cost). State is preserved for an instant resume.
     if (!this.renderer || !this.renderActive) return
-    this.currentPage?.update?.(this.time)
+    const page = this.currentPage
+    page?.update?.(this.time)
+    // Render-on-demand: when the page reports it's settled (`needsRender === false`)
+    // skip the draw — the last frame stays on screen, so idle costs ~nothing. Pages
+    // without the getter render every frame as before. A staged transition mesh
+    // (dormant on this site) or a pending resume-draw forces the draw.
+    const settled = page && page.needsRender === false && !this.transition?.transitionMesh
+    if (settled && !this._resumeDraw) return
+    this._resumeDraw = false
     this.renderer.render(this.scene, this.camera)
   }
 

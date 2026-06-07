@@ -21,6 +21,7 @@ export default defineNuxtPlugin({
       nuxtApp.provide('webgl', {
         enabled: false,
         activeRef: ref(false),
+        visibleRef: ref(true),
         ensure() {},
         mount() {},
         unmount() {},
@@ -36,6 +37,14 @@ export default defineNuxtPlugin({
     const onMq = (e) => { activeRef.value = e.matches }
     mq.addEventListener('change', onMq)
 
+    // Tab-visibility gate — pauses rendering when the tab is backgrounded so the
+    // particle sim doesn't keep cooking the GPU in a hidden tab. Combined with the
+    // breakpoint gate in WebGLCanvas (active = desktop AND visible). visibilitychange
+    // only — NOT blur/focus, which fire while the tab is still on-screen.
+    const visibleRef = ref(!document.hidden)
+    const onVis = () => { visibleRef.value = !document.hidden }
+    document.addEventListener('visibilitychange', onVis)
+
     let canvas = null
     let loadPromise = null
     let tick = null
@@ -45,6 +54,7 @@ export default defineNuxtPlugin({
     const controller = {
       enabled: true,
       activeRef,
+      visibleRef,
       get currentPage() { return canvas?.currentPage ?? null },
       get transition() { return canvas?.transition ?? null },
       get renderer() { return canvas?.renderer ?? null },
@@ -85,6 +95,7 @@ export default defineNuxtPlugin({
       import.meta.hot.dispose(() => {
         if (tick) gsap.ticker.remove(tick)
         mq.removeEventListener('change', onMq)
+        document.removeEventListener('visibilitychange', onVis)
       })
     }
 

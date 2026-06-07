@@ -71,6 +71,25 @@ onMounted(async () => {
   // SplitText measures rendered glyphs — split before fonts load and lines
   // mis-wrap (same reason useAnims awaits this).
   await document.fonts.ready
+
+  // The Social list ([data-menu-line]) is data-driven by the LAZY `settings`
+  // query. SplitText mutates the DOM (masked, off-screen line wrappers), so its
+  // <li>s must exist BEFORE it runs — otherwise late-rendered links land inside
+  // SplitText's structure and get clipped → blank (Safari/FF, where the query
+  // resolves after fonts.ready). Wait for the CMS to settle first. cmsReady
+  // flips on success OR error, so a failed/blocked fetch still proceeds (no hang).
+  if (!cmsReady.value) {
+    await new Promise((resolve) => {
+      const stop = watch(cmsReady, (v) => {
+        if (v) {
+          stop()
+          resolve()
+        }
+      })
+    })
+  }
+  await nextTick() // ensure the social <li>s are patched into the DOM
+
   if (!panel.value) return
 
   const lineEls = panel.value.querySelectorAll('[data-menu-line]')

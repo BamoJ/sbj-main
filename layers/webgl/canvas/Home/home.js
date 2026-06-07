@@ -35,6 +35,12 @@ export class Home extends Page {
     this.mouse = new THREE.Vector2(-99999, -99999)
     this.animationCount = 0
 
+    // Render-on-demand state. The sim + draw only run while one of these holds;
+    // otherwise the logo is settled + static (flow is off) and we sleep — see
+    // `needsRender` + `update()`. Canvas.update() reads `needsRender` to skip the draw.
+    this._introActive = false // the gather tween is animating uniforms
+    this._wakeFrames = 0 // force a few frames after a state change (enter/resize)
+
     this.count = 0
     this.simSize = 0
     this.relativePositions = []
@@ -145,10 +151,12 @@ export class Home extends Page {
     if (!this._armed) this._armScatter() // safety — guarantee a scattered start
     const u = this.material.uniforms
 
+    this._introActive = true // keep the loop awake for the full gather tween
     const tl = gsap.timeline({
       onComplete: () => {
         this._introLock = false // hand the mouse back exactly when the gather ends
         this._armed = false
+        this._introActive = false // gather done — allow sleep once the mouse settles
       },
     })
     tl.to(
@@ -192,6 +200,7 @@ export class Home extends Page {
     // Arm the scatter NOW (preloader still covers the screen) so the particles sit
     // invisibly dispersed — the first visible frame is scattered, never the logo.
     this._armScatter()
+    this._wakeFrames = 3 // draw the armed-scatter frame before sleeping
 
     this._onMouseMove = (e) => {
       if (this._introLock) return // intro gather owns the particles — ignore the mouse
@@ -212,8 +221,19 @@ export class Home extends Page {
     super.onLeave()
   }
 
+  // Render-on-demand gate. Awake while the gather tween runs, while a mouse
+  // impulse is still coasting (animationCount), or for a few frames after a state
+  // change (enter/resize). Otherwise the logo is settled + static (flow is off),
+  // so we sleep — Canvas.update() reads this to skip the draw, and update() below
+  // skips the GPU sim pass. The last frame stays on screen until the next wake.
+  get needsRender() {
+    return this._introActive || this.animationCount > 0 || this._wakeFrames > 0
+  }
+
   update() {
     if (!this.isActive || !this.simulation) return
+    if (!this.needsRender) return // settled → skip the GPU sim pass (idle = ~0 cost)
+    if (this._wakeFrames > 0) this._wakeFrames--
 
     const hasImpulse = this.animationCount > 0
     if (hasImpulse) this.animationCount--
@@ -225,6 +245,7 @@ export class Home extends Page {
 
   onResize() {
     if (!this.simulation) return
+    this._wakeFrames = 3 // draw the reseeded/recentered frame, then settle again
     const { width, height } = this._getResolution()
     this.material.uniforms.u_resolution.value.set(width, height)
 

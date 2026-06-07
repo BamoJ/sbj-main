@@ -11,27 +11,35 @@ import { emitter } from '~/utils/Emitter'
 const container = ref(null)
 const route = useRoute()
 const webgl = useWebGL()
-const active = computed(() => webgl?.activeRef?.value ?? false)
+// Two SEPARATE gates, deliberately not combined:
+//   • breakpointActive (viewport ≥ breakpoint) drives the one-time BUILD. The
+//     build must NOT depend on tab visibility, or a page first loaded in a hidden
+//     tab would never emit `webgl:ready` and the preloader would stall on it.
+//   • renderable (breakpoint AND tab visible) drives setRenderActive — the live
+//     pause/resume of the draw loop, so a hidden tab pays no GPU cost.
+const breakpointActive = computed(() => webgl?.activeRef?.value ?? false)
+const visible = computed(() => webgl?.visibleRef?.value ?? true)
+const renderable = computed(() => breakpointActive.value && visible.value)
 
 let built = false
-async function syncActive(on) {
-  if (!webgl?.enabled || !container.value) return
-  if (on && !built) {
-    built = true
-    // Lazily import three + build the Canvas here (first desktop activation) —
-    // this is the seam that keeps three.js out of the boot bundle.
-    await webgl.ensure?.()
-    webgl.mount(container.value)
-    // onChange resolves after the view's load() (rasterize PNG) + sim build —
-    // i.e. the particles are ready. The preloader's tracker waits on this.
-    await webgl.onChange(route.name)
-    emitter.emit('webgl:ready')
-  }
-  webgl.setRenderActive?.(on)
+async function build() {
+  if (!webgl?.enabled || !container.value || built) return
+  built = true
+  // Lazily import three + build the Canvas here (first desktop activation) — this
+  // is the seam that keeps three.js out of the boot bundle.
+  await webgl.ensure?.()
+  webgl.mount(container.value)
+  // onChange resolves after the view's load() (rasterize PNG) + sim build — i.e.
+  // the particles are ready. The preloader's tracker waits on this event; it fires
+  // regardless of tab visibility, so the preloader never hangs in a background tab.
+  await webgl.onChange(route.name)
+  emitter.emit('webgl:ready')
+  webgl.setRenderActive?.(renderable.value) // sync the render gate now the canvas exists
 }
 
-onMounted(() => syncActive(active.value))
-watch(active, syncActive)
+onMounted(() => { if (breakpointActive.value) build() })
+watch(breakpointActive, (on) => { if (on) build() }) // first desktop crossing builds (once)
+watch(renderable, (on) => webgl.setRenderActive?.(on)) // pause/resume on visibility + breakpoint
 
 onBeforeUnmount(() => {
   if (!webgl?.enabled) return
@@ -41,7 +49,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div
-    v-show="active"
+    v-show="breakpointActive"
     ref="container"
     class="webgl-canvas"
     aria-hidden="true"

@@ -31,11 +31,34 @@ pass per frame** over the particle texture (`sim.frag.glsl`), then the points ar
   that guard so it's free when flow is off.
 - Needs WebGL2 float render targets; HalfFloat fallback in `Simulation.js`.
 
-### 4. Render loop + idle pause
+### 4. Render loop + idle/visibility/sleep pause
 `gsap.ticker → canvas.time.tick() → trigger('tick') → Canvas.update()` — one RAF for
-Lenis + ScrollTrigger + WebGL. `Canvas.update()` early-returns unless `renderActive` —
-`WebGLCanvas.vue` calls `setRenderActive(false)` below 768px, so the loop **idles** while
-the static BG shows. Don't add separate `requestAnimationFrame` loops; hook the ticker.
+Lenis + ScrollTrigger + WebGL. Don't add separate `requestAnimationFrame` loops; hook the
+ticker. Three gates stop the GPU work (the ticker keeps firing for Lenis throughout — only
+the sim + draw stop):
+- **Breakpoint** — `Canvas.update()` early-returns unless `renderActive`; `WebGLCanvas.vue`
+  calls `setRenderActive(false)` below 768px (static BG shows).
+- **Tab visibility** — `webgl.client.js` exposes `visibleRef` (a `visibilitychange` listener);
+  `WebGLCanvas.vue` folds it into `active` (`active = desktop && visible`), so a hidden tab
+  pauses (no background-tab GPU cost). Uses `visibilitychange` only, never blur/focus.
+- **Idle-sleep (render-on-demand)** — the Home view exposes `get needsRender()`
+  ([home.js](layers/webgl/canvas/Home/home.js)): true only while the intro gather tween runs,
+  a mouse impulse is coasting (`animationCount`), or a few `_wakeFrames` after enter/resize.
+  When false the logo is settled + static (flow off), so `Home.update()` skips the sim pass and
+  `Canvas.update()` skips the draw — the last frame stays on screen. A `mousemove` sets
+  `animationCount = 300`, waking it on the next tick. **This is the main idle power fix** — at
+  rest the hero costs ~0 GPU instead of re-simulating 262k particles forever. A new view that
+  animates continuously should give it a `needsRender` getter (or omit it to render every
+  frame, the backward-compatible default).
+
+### FPS overlay (dev)
+[FpsMeter.vue](app/components/Global/FpsMeter.vue) — dev-only on-screen meter, **Shift+F** to
+toggle (mounted behind `import.meta.dev` in [app.vue](app/app.vue); never ships to prod).
+Shows **fps** (gsap.ticker/rAF rate — stays at display refresh), **GL draws/s**
+(`renderer.info.render.frame` delta — the key line: **~0 when the sim is asleep or the tab is
+hidden**, ~refresh while interacting), draw **calls / points**, and frame **ms** (green ≥58 /
+amber ≥45 / red). Zero-code cross-checks: Chrome DevTools → Rendering → **Frame Rendering
+Stats**, and **Chrome Task Manager** (Shift+Esc) → GPU column.
 
 ### 5. Capability bypass (don't break)
 [webgl.client.js](layers/webgl/plugins/webgl.client.js) `setup()`:

@@ -38,10 +38,19 @@ const baseClass =
    to the right on leave (transform-origin flips). `background-color:
    currentColor` makes the line track the cascading link-fg token, so it
    themes automatically with .u-theme-*. */
+/* `padding-bottom` reclaims the 1px gap inside the box so the underline can sit
+   at `bottom: 0` (inside the element) instead of below it. This keeps the line
+   from being clipped by any `overflow-hidden` ancestor — load-reveal wrappers
+   and SplitText `mask:'lines'` line-masks all clip to the box, and an underline
+   drawn outside the box (the old `bottom: -0.0625em`) was getting cut away. */
+[data-underline-link] {
+  padding-bottom: 0.0625em;
+}
+
 [data-underline-link]::before {
   content: '';
   position: absolute;
-  bottom: -0.0625em;
+  bottom: 0;
   left: 0;
   width: 100%;
   height: 0.0625em;
