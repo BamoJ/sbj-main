@@ -11,9 +11,20 @@ export default defineNuxtConfig({
   // call sites in pages) to ship a pure GSAP/Lenis/Sanity Nuxt starter.
   extends: ['layers/webgl'],
 
-  // GSAP, Lenis, Three.js/OGL all assume `window` — SPA mode by default.
-  // Flip per-route only if a content page genuinely needs SEO indexing.
-  ssr: false,
+  // SSR is ON so the landing can be PRERENDERED to static HTML at build time
+  // (full content + meta + schema baked in for crawlers/social). The client still
+  // hydrates into the page-transition SPA. Browser-only libs are client-guarded:
+  // useLenis() no-ops on the server, and WebGL is a `.client` plugin. Future
+  // SPA-only routes can opt out per-route with routeRules: { '/path': { ssr: false } }.
+  ssr: true,
+
+  // Prerender the landing (the only route) — renders at build → static HTML with
+  // baked SEO/social meta. Absolute URLs (canonical, og:url, og:image, sitemap)
+  // freeze from `site.url` AT BUILD, so NUXT_PUBLIC_SITE_URL must be set in the
+  // build env (https://bamoj.com in prod).
+  routeRules: {
+    '/': { prerender: true },
+  },
 
   css: ['~/assets/css/index.css'],
 
@@ -50,7 +61,7 @@ export default defineNuxtConfig({
       type: 'Organization',
       name: process.env.NUXT_PUBLIC_SITE_NAME || 'Studio•Bamo.J®',
       url: process.env.NUXT_PUBLIC_SITE_URL || 'http://localhost:3000',
-      logo: '/images/og-default.webp',
+      logo: '/apple-touch-icon.png',
       sameAs: [
         // Uncomment and set per client project:
         // process.env.NUXT_PUBLIC_INSTAGRAM,
@@ -86,14 +97,16 @@ export default defineNuxtConfig({
     ],
   },
 
-  // Sanity — hardcoded for bamoj.com. The projectId + dataset are PUBLIC
-  // (they ship in the client bundle for CDN reads), so they live here instead
-  // of .env — no env juggling across the frontend + studio. useCdn: true is
+  // Sanity — projectId + dataset come from env (read at build time). They're
+  // PUBLIC (Sanity: "project IDs are not secret"; they ship in the client bundle
+  // for CDN reads), so NUXT_PUBLIC_ is accurate — env-driving them just matches
+  // Sanity's template convention + lets you swap datasets per environment. They
+  // MUST be set in .env (local) and Vercel, or the build fails. useCdn: true is
   // the cheap/fast path for public read queries.
   sanity: {
-    projectId: '7ysaqk08',
-    dataset: 'production',
-    apiVersion: '2025-05-20',
+    projectId: process.env.NUXT_PUBLIC_SANITY_PROJECT_ID,
+    dataset: process.env.NUXT_PUBLIC_SANITY_DATASET,
+    apiVersion: process.env.NUXT_PUBLIC_SANITY_API_VERSION || '2025-05-20',
     useCdn: true,
   },
 
@@ -104,7 +117,9 @@ export default defineNuxtConfig({
   // no idea what `provider="sanity"` means → render crash.
   image: {
     sanity: {
-      projectId: '7ysaqk08',
+      // `!` — @nuxt/image types this as required string. It must be set (env),
+      // or the build fails loudly, which is the intended behaviour here.
+      projectId: process.env.NUXT_PUBLIC_SANITY_PROJECT_ID!,
     },
   },
 
@@ -133,7 +148,15 @@ export default defineNuxtConfig({
       htmlAttrs: { lang: 'en' },
       // Favicon lives at public/sbj-favicon.ico. The ?v= query busts the
       // browser's aggressive favicon cache; bump it whenever the icon changes.
-      link: [{ rel: 'icon', type: 'image/x-icon', href: '/sbj-fav.svg' }],
+      link: [
+        // Modern SVG favicon (scalable, dark-mode aware). type was wrong before
+        // (image/x-icon on an .svg) — corrected to image/svg+xml.
+        { rel: 'icon', type: 'image/svg+xml', href: '/sbj-fav.svg' },
+        // Legacy .ico fallback for browsers without SVG-favicon support.
+        { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
+        // iOS "Add to Home Screen" (the webclip) + Android home-screen fallback.
+        { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+      ],
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'theme-color', content: '#353233' },

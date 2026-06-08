@@ -13,6 +13,11 @@ let tickerCallback = null
 const scrollY = ref(0)
 
 export function useLenis(options = {}) {
+  // SSR / prerender: Lenis needs `window`. Return inert controls (lenis stays
+  // null; makeControls' start/stop/scrollTo are `?.`-guarded no-ops) so callers
+  // like app.vue and Preloader.vue are safe during the build-time render. The
+  // real instance initializes on the client.
+  if (import.meta.server) return makeControls()
   if (lenis) return makeControls()
 
   lenis = new Lenis({

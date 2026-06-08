@@ -15,7 +15,17 @@ definePageMeta({ name: 'home' })
 // touch / reduced-motion (never active) or viewport below the breakpoint.
 // Reactive, so it swaps live on resize.
 const webgl = useWebGL()
-const showLogoFallback = computed(() => !webgl?.activeRef?.value)
+// Hydration-safe: the server (prerender) has no $webgl, so it renders the static
+// texture.png fallback. Keep showing it until mounted so the client's FIRST render
+// matches the server HTML (no hydration mismatch); after mount it reacts to
+// activeRef and swaps to the WebGL canvas on desktop.
+const mounted = ref(false)
+onMounted(() => {
+  mounted.value = true
+})
+const showLogoFallback = computed(
+  () => !mounted.value || !webgl?.activeRef?.value,
+)
 
 // One-page homepage / work index for the bamoj.com placeholder.
 useSanitySeo('home', {
@@ -23,6 +33,9 @@ useSanitySeo('home', {
   description:
     'The portfolio of Bamo.J® — a creative studio working at the intersection of design, motion, and code.',
   ogType: 'website',
+  // Static share image (1200×630). @nuxtjs/seo resolves it to an absolute URL
+  // from site.url at build → baked into the prerendered og:image / twitter:image.
+  ogImage: '/sbj-og.png',
 })
 
 // Site settings singleton — social links for the footer cell.
@@ -30,12 +43,14 @@ useSanitySeo('home', {
 // and holds the ENTIRE app — including the <Preloader> overlay in app.vue — out
 // of the DOM until Sanity answers. Lazy lets the app mount the instant JS boots;
 // the data streams in after (template already guards with `?.` / empty v-for).
-const { data: settings, status: settingsStatus } = useLazySanityQuery(groq`*[_type == "settings"][0]{
+const { data: settings, status: settingsStatus } =
+  useLazySanityQuery(groq`*[_type == "settings"][0]{
   socials[]{ label, url }
 }`)
 
 // Work index — all projects in Studio order (drag-to-reorder via orderRank).
-const { data: projects, status: projectsStatus } = useLazySanityQuery(groq`*[_type == "project"] | order(orderRank){
+const { data: projects, status: projectsStatus } =
+  useLazySanityQuery(groq`*[_type == "project"] | order(orderRank){
   _id, title, role, year, url
 }`)
 
@@ -46,7 +61,11 @@ const { data: projects, status: projectsStatus } = useLazySanityQuery(groq`*[_ty
 const cmsReady = useState('cms:ready', () => false)
 const isSettled = (s) => s === 'success' || s === 'error'
 watchEffect(() => {
-  if (isSettled(settingsStatus.value) && isSettled(projectsStatus.value)) cmsReady.value = true
+  if (
+    isSettled(settingsStatus.value) &&
+    isSettled(projectsStatus.value)
+  )
+    cmsReady.value = true
 })
 
 // Menu panel open state — shared with the MainNav button via the same
@@ -280,7 +299,10 @@ useAnims()
             <div
               class="flex flex-col h-full justify-between pt-[2em]"
             >
-              <span data-menu-line class="text-large leading-[1.1]">
+              <span
+                data-menu-line
+                class="text-large leading-[1.1] max-md:text-medium"
+              >
                 Studio•Bämo.J® is an independent creative studio with
                 a primary focus on web experiences, digital design,
                 motion–interaction and development delivering bespoke

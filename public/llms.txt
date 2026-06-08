@@ -6,7 +6,7 @@
 
 ## Pages
 
-- [Home](http://localhost:3000/): Studio overview and an index of selected work
+- [Home](https://bamoj.com/): Studio overview and an index of selected work
 
 ## Notes
 
