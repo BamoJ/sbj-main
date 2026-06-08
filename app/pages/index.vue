@@ -31,7 +31,7 @@ const showLogoFallback = computed(
 useSanitySeo('home', {
   title: 'Studio•Bamo.J®',
   description:
-    'The portfolio of Bamo.J® — a creative studio working at the intersection of design, motion, and code.',
+    'Award-winning independent design studio specializing in digital design, motion – interactions, and art direction. Led by Bimo Tri (Bamo.J®).',
   ogType: 'website',
   // Static share image (1200×630). @nuxtjs/seo resolves it to an absolute URL
   // from site.url at build → baked into the prerendered og:image / twitter:image.
