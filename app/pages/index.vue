@@ -397,7 +397,7 @@ useAnims()
                       data-menu-line
                       class="flex flex-col gap-1 mt-5 items-start"
                     >
-                      <span>Project Inquiries</span>
+                      <span>General Inquiries</span>
                       <TextLink
                         class="text-small"
                         href="mailto:hi@bamoj.com"
