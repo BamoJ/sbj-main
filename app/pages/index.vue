@@ -226,7 +226,7 @@ useAnims()
         :class="
           isOpen ? 'pointer-events-auto' : 'pointer-events-none'
         "
-        class="relative w-1/2 h-full bg-black pt-2 transform-gpu max-md:w-full"
+        class="relative w-1/2 h-full bg-black pt-2 transform-gpu max-[991px]:w-full"
       >
         <div
           class="absolute top-0 left-0 w-full h-full pointer-events-none"
@@ -301,7 +301,7 @@ useAnims()
             >
               <span
                 data-menu-line
-                class="text-large leading-[1.1] max-md:text-medium"
+                class="text-large leading-[1.1] max-md:text-[1.25rem]"
               >
                 Studio•Bämo.J® is an independent creative studio with
                 a primary focus on web experiences, digital design,
@@ -320,10 +320,17 @@ useAnims()
                   </div>
                   <div
                     data-menu-fade
-                    class="rounded-round bg-amber-50 w-2 h-2 col-start-1"
+                    class="rounded-round bg-amber-50 w-2 h-2 col-start-1 col-end-1"
                   ></div>
-                  <div class="col-start-3 flex flex-col gap-1">
-                    <span data-menu-line>Services</span>
+                  <div
+                    class="col-start-3 flex flex-col gap-1 max-sm:col-start-2 max-sm:col-span-2"
+                  >
+                    <span
+                      class="max-sm:text-[0.85rem]"
+                      data-menu-line
+                    >
+                      Services
+                    </span>
                     <ul
                       data-menu-line
                       class="mt-2 flex flex-col text-small"
@@ -335,9 +342,14 @@ useAnims()
                     </ul>
                   </div>
                   <div
-                    class="col-start-5 col-span-2 flex flex-col gap-1"
+                    class="col-start-5 col-span-2 flex flex-col gap-1 max-sm:col-start-4"
                   >
-                    <span data-menu-line>Accolades</span>
+                    <span
+                      class="max-sm:text-[0.85rem]"
+                      data-menu-line
+                    >
+                      Accolades
+                    </span>
                     <ul
                       data-menu-line
                       class="mt-2 flex flex-col text-small"
@@ -364,8 +376,15 @@ useAnims()
                     data-menu-fade
                     class="rounded-round bg-amber-50 w-2 h-2 col-start-1"
                   ></div>
-                  <div class="col-start-3 flex flex-col gap-1">
-                    <span data-menu-line>Social</span>
+                  <div
+                    class="col-start-3 flex flex-col gap-1 max-sm:col-start-2"
+                  >
+                    <span
+                      class="max-sm:text-[0.85rem]"
+                      data-menu-line
+                    >
+                      Social
+                    </span>
                     <ul
                       data-menu-line
                       class="mt-2 flex flex-col text-small"
@@ -380,12 +399,19 @@ useAnims()
                       </li>
                     </ul>
                   </div>
-                  <div class="col-start-5 col-span-2">
+                  <div
+                    class="col-start-5 col-span-2 max-sm:col-start-4 max-sm:col-span-3"
+                  >
                     <div
                       data-menu-line
                       class="flex flex-col gap-1 items-start"
                     >
-                      <span>Project Inquiries</span>
+                      <span
+                        class="max-sm:text-[0.85rem]"
+                        data-menu-line
+                      >
+                        Project Inquiries
+                      </span>
                       <TextLink
                         class="text-small"
                         href="https://cal.com/bamoj/discovery-session"
@@ -395,9 +421,14 @@ useAnims()
                     </div>
                     <div
                       data-menu-line
-                      class="flex flex-col gap-1 mt-5 items-start"
+                      class="flex flex-col gap-1 mt-5 items-start max-sm:mt-3"
                     >
-                      <span>General Inquiries</span>
+                      <span
+                        class="max-sm:text-[0.85rem]"
+                        data-menu-line
+                      >
+                        General Inquiries
+                      </span>
                       <TextLink
                         class="text-small"
                         href="mailto:hi@bamoj.com"
@@ -438,10 +469,10 @@ useAnims()
         class="pointer-events-none absolute inset-0 h-full w-full object-cover"
       />
 
-      <Container class="flex h-screen min-h-screen flex-col">
+      <Container class="flex h-dvh min-h-dvh flex-col">
         <div class="w-full flex-1 grid grid-cols-12 gap-gutter">
           <div
-            class="relative w-full h-full col-start-8 col-end-[13] max-md:col-start-1 max-md:col-end-[13]"
+            class="relative w-full h-full col-start-8 col-end-[13] max-[991px]:col-start-5 max-[991px]:col-end-13 max-[479px]:col-start-1 max-[479px]:col-end-13"
           >
             <div
               class="w-full h-full flex flex-col pt-[10vh] max-md:pt-[15vh]"
@@ -507,7 +538,9 @@ useAnims()
                       </div>
                     </div>
 
-                    <div class="overflow-hidden col-span-1">
+                    <div
+                      class="overflow-hidden col-span-1 max-sm:hidden"
+                    >
                       <span
                         data-load-mid
                         class="inline-block text-main"
@@ -516,7 +549,7 @@ useAnims()
                       </span>
                     </div>
                     <div
-                      class="overflow-hidden col-span-1 max-md:col-start-6"
+                      class="overflow-hidden col-span-1 max-md:col-start-6 max-sm:place-self-end"
                     >
                       <span
                         data-load-mid
